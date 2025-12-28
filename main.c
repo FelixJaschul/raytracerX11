@@ -40,9 +40,6 @@ typedef struct {
     Material mat;
 } HitRecord;
 
-bool intersect_sphere(Ray ray, Sphere sphere, HitRecord *rec);
-bool intersect_rect(Ray ray, Rect rect, HitRecord *rec);
-
 #define MAX_SPHERES 1
 #define MAX_RECTS 6
 #define MAX_BOUNCES 3
@@ -50,7 +47,7 @@ bool intersect_rect(Ray ray, Rect rect, HitRecord *rec);
 Sphere scene_spheres[MAX_SPHERES];
 Rect scene_rects[MAX_RECTS];
 int num_spheres = 0;
-int num_rects = 0;
+int num_rects   = 0;
 
 void add_sphere(
     const Vec3 center,
@@ -75,6 +72,122 @@ void add_rect(
 {
     if (num_rects < MAX_RECTS) scene_rects[num_rects++] = (Rect){point, norm(normal), norm(u), norm(v), width, height, {color, refl, spec}};
 }
+
+void sInit()
+{
+    add_rect(vec3(0, 0, 0), vec3(0, 1, 0), vec3(1, 0, 0), vec3(0, 0, 1), 6.0f, 5.0f, vec3(0.2f, 0.2f, 1.0f), 0.3f, 0.5f);
+    add_rect(vec3(0, 4, 0), vec3(0, -1, 0), vec3(1, 0, 0), vec3(0, 0, 1), 6.0f, 5.0f, vec3(1, 1, 1), 0.08f, 0.0f);
+    add_rect(vec3(-3, 2, 0), vec3(1, 0, 0), vec3(0, 0, 1), vec3(0, 1, 0), 5.0f, 4.0f, vec3(1, 0.2f, 0.2f), 0.08f, 0.0f);
+    add_rect(vec3(3, 2, 0), vec3(-1, 0, 0), vec3(0, 0, 1), vec3(0, 1, 0), 5.0f, 4.0f, vec3(0.2f, 1, 0.2f), 0.08f, 0.0f);
+    add_rect(vec3(0, 2, -2.5f), vec3(0, 0, 1), vec3(1, 0, 0), vec3(0, 1, 0), 6.0f, 4.0f, vec3(1, 1, 1), 0.08f, 0.0f);
+    add_sphere(vec3(0, 2, 0), 1.0f, vec3(1.0f, 1.0f, 1.0f), 0.8f, 1.0f);
+}
+
+// Forward declaration
+Vec3 ray_color(Ray ray, int depth);
+Vec3 compute_lighting(Vec3 point, Vec3 normal, Vec3 view_dir, Material mat);
+bool trace_scene(Ray ray, HitRecord *closest_rec);
+static inline uint32_t color_to_uint32(Vec3 color);
+
+int main()
+{
+    xWindow win;
+    xInit(&win);
+    win.title = XTITLE;
+    xCreateWindow(&win);
+
+    Vec3 camera_pos = vec3(0, 2, 5);
+    float yaw = -90.0f;
+    float pit = 0.0f;
+
+    sInit();
+
+    const float viewport_height = 2.0f;
+    const float viewport_width = (float)win.width / (float)win.height * viewport_height;
+
+    // Precompute u/v offsets
+    float* u_offsets = malloc(win.width * sizeof(float));
+    float* v_offsets = malloc(win.height * sizeof(float));
+    for (int x = 0; x < win.width; x++) u_offsets[x] = ((float)x / (float)(win.width - 1) - 0.5f) * viewport_width;
+    for (int y = 0; y < win.height; y++) v_offsets[y] = ((float)(win.height - 1 - y) / (float)(win.height - 1) - 0.5f) * viewport_height;
+
+    while (1)
+    {
+        const float rspeed = 0.4f;
+        const float mspeed = 0.02f;
+        if (xPollEvents(win.display)) break;
+        if (xIsKeyPressed(Escape))    break;
+
+        if (xIsKeyDown(Left))  yaw -= rspeed;
+        if (xIsKeyDown(Right)) yaw += rspeed;
+        if (xIsKeyDown(Up))    pit += rspeed;
+        if (xIsKeyDown(Down))  pit -= rspeed;
+
+        if (pit >  89.0f) pit =  89.0f;
+        if (pit < -89.0f) pit = -89.0f;
+
+        // Camera front vector
+        const float sin_pitch = sinf(pit * M_PI / 180.0f);
+        const float cos_pitch = cosf(pit * M_PI / 180.0f);
+        const float sin_yaw   = sinf(yaw * M_PI / 180.0f);
+        const float cos_yaw   = cosf(yaw * M_PI / 180.0f);
+
+        Vec3 front = {cos_yaw * cos_pitch, sin_pitch, sin_yaw * cos_pitch};
+        front = norm(front);
+
+        const Vec3 right = norm(cross(front, vec3(0, 1, 0)));
+        const Vec3 up    = cross(right, front);
+
+        if (xIsKeyDown(W)) camera_pos = add(camera_pos, mul(front, mspeed));
+        if (xIsKeyDown(S)) camera_pos = sub(camera_pos, mul(front, mspeed));
+        if (xIsKeyDown(A)) camera_pos = sub(camera_pos, mul(right, mspeed));
+        if (xIsKeyDown(D)) camera_pos = add(camera_pos, mul(right, mspeed));
+
+        #pragma omp parallel for schedule(dynamic)
+        for (int y = 0; y < win.height; y++)
+        {
+            const Vec3 row_offset = mul(up, v_offsets[y]);
+            for (int x = 0; x < win.width; x++)
+            {
+                Vec3 rd = add(front, add(row_offset, mul(right, u_offsets[x])));
+                rd = norm(rd);
+
+                const Ray ray = {camera_pos, rd};
+                const Vec3 color = ray_color(ray, MAX_BOUNCES);
+                win.buffer[y * win.width + x] = color_to_uint32(color);
+            }
+        }
+
+        xUpdateFramebuffer(&win);
+        xUpdateInput();
+    }
+
+    free(u_offsets);
+    free(v_offsets);
+    xDestroyWindow(&win);
+    return 0;
+}
+
+static inline uint32_t color_to_uint32(
+    const Vec3 color)
+{
+    float r = color.x;
+    if (r < 0.0f) r = 0.0f;
+    if (r > 1.0f) r = 1.0f;
+    float g = color.y;
+    if (g < 0.0f) g = 0.0f;
+    if (g > 1.0f) g = 1.0f;
+    float b = color.z;
+    if (b < 0.0f) b = 0.0f;
+    if (b > 1.0f) b = 1.0f;
+    return ((int)(r * 255) << 16) |
+           ((int)(g * 255) << 8) |
+            (int)(b * 255);
+}
+
+// Forward declaration
+bool intersect_sphere(Ray ray, Sphere sphere, HitRecord *rec);
+bool intersect_rect(Ray ray, Rect rect, HitRecord *rec);
 
 bool trace_scene(
     const Ray ray,
@@ -140,112 +253,6 @@ Vec3 ray_color(
         return color;
     }
     return vec3(0, 0, 0);
-}
-
-static inline uint32_t color_to_uint32(
-    const Vec3 color)
-{
-    float r = color.x;
-    if (r < 0.0f) r = 0.0f;
-    if (r > 1.0f) r = 1.0f;
-    float g = color.y;
-    if (g < 0.0f) g = 0.0f;
-    if (g > 1.0f) g = 1.0f;
-    float b = color.z;
-    if (b < 0.0f) b = 0.0f;
-    if (b > 1.0f) b = 1.0f;
-    return ((int)(r * 255) << 16) |
-           ((int)(g * 255) << 8) |
-            (int)(b * 255);
-}
-
-void sInit()
-{
-    add_rect(vec3(0, 0, 0), vec3(0, 1, 0), vec3(1, 0, 0), vec3(0, 0, 1), 6.0f, 5.0f, vec3(0.2f, 0.2f, 1.0f), 0.3f, 0.5f);
-    add_rect(vec3(0, 4, 0), vec3(0, -1, 0), vec3(1, 0, 0), vec3(0, 0, 1), 6.0f, 5.0f, vec3(1, 1, 1), 0.08f, 0.0f);
-    add_rect(vec3(-3, 2, 0), vec3(1, 0, 0), vec3(0, 0, 1), vec3(0, 1, 0), 5.0f, 4.0f, vec3(1, 0.2f, 0.2f), 0.08f, 0.0f);
-    add_rect(vec3(3, 2, 0), vec3(-1, 0, 0), vec3(0, 0, 1), vec3(0, 1, 0), 5.0f, 4.0f, vec3(0.2f, 1, 0.2f), 0.08f, 0.0f);
-    add_rect(vec3(0, 2, -2.5f), vec3(0, 0, 1), vec3(1, 0, 0), vec3(0, 1, 0), 6.0f, 4.0f, vec3(1, 1, 1), 0.08f, 0.0f);
-    add_sphere(vec3(0, 2, 0), 1.0f, vec3(1.0f, 1.0f, 1.0f), 0.08f, 0.0f);
-}
-
-int main()
-{
-    xWindow win;
-    xInit(&win);
-    win.title = XTITLE;
-    xCreateWindow(&win);
-
-    Vec3 camera_pos = vec3(0, 2, 5);
-    float   yaw = -90.0f,
-            pitch = 0.0f;
-
-    sInit();
-
-    const float viewport_height = 2.0f;
-    const float viewport_width = (float)win.width / (float)win.height * viewport_height;
-
-    // Precompute u/v offsets
-    float* u_offsets = malloc(win.width * sizeof(float));
-    float* v_offsets = malloc(win.height * sizeof(float));
-    for (int x = 0; x < win.width; x++) u_offsets[x] = ((float)x / (float)(win.width - 1) - 0.5f) * viewport_width;
-    for (int y = 0; y < win.height; y++) v_offsets[y] = ((float)(win.height - 1 - y) / (float)(win.height - 1) - 0.5f) * viewport_height;
-
-    while (1)
-    {
-        const float rot_speed = 0.4f;
-        const float move_speed = 0.02f;
-        if (xPollEvents(win.display)) break;
-        if (xIsKeyPressed(Escape)) break;
-
-        if (xIsKeyDown(Left))  yaw -= rot_speed;
-        if (xIsKeyDown(Right)) yaw += rot_speed;
-        if (xIsKeyDown(Up))    pitch += rot_speed;
-        if (xIsKeyDown(Down))  pitch -= rot_speed;
-
-        if (pitch > 89.0f) pitch = 89.0f;
-        if (pitch < -89.0f) pitch = -89.0f;
-
-        // Camera front vector
-        const float sin_pitch = sinf(pitch * M_PI / 180.0f);
-        const float cos_pitch = cosf(pitch * M_PI / 180.0f);
-        const float sin_yaw   = sinf(yaw   * M_PI / 180.0f);
-        const float cos_yaw   = cosf(yaw   * M_PI / 180.0f);
-
-        Vec3 front = {cos_yaw * cos_pitch, sin_pitch, sin_yaw * cos_pitch};
-        front = norm(front);
-
-        const Vec3 right = norm(cross(front, vec3(0, 1, 0)));
-        const Vec3 up    = cross(right, front);
-
-        if (xIsKeyDown(W)) camera_pos = add(camera_pos, mul(front, move_speed));
-        if (xIsKeyDown(S)) camera_pos = sub(camera_pos, mul(front, move_speed));
-        if (xIsKeyDown(A)) camera_pos = sub(camera_pos, mul(right, move_speed));
-        if (xIsKeyDown(D)) camera_pos = add(camera_pos, mul(right, move_speed));
-
-        #pragma omp parallel for schedule(dynamic)
-        for (int y = 0; y < win.height; y++)
-        {
-            const Vec3 row_offset = mul(up, v_offsets[y]);
-            for (int x = 0; x < win.width; x++)
-            {
-                Vec3 rd = add(front, add(row_offset, mul(right, u_offsets[x])));
-                rd = norm(rd);
-
-                const Ray ray = {camera_pos, rd};
-                const Vec3 color = ray_color(ray, MAX_BOUNCES);
-                win.buffer[y * win.width + x] = color_to_uint32(color);
-            }
-        }
-
-        xUpdateFramebuffer(&win);
-        xUpdateInput();
-    }
-
-    free(u_offsets);
-    free(v_offsets);
-    xDestroyWindow(&win);
-    return 0;
 }
 
 bool intersect_sphere(
