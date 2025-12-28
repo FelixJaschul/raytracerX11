@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <time.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
@@ -13,10 +14,11 @@ extern "C" {
 #endif
 
 // Window Struct
-typedef struct xWindow 
+typedef struct xWindow
 {
-    Display *display;
     Window window;
+    Display *display;
+    XImage *image;
     int screen;
     GC gc;
     int width;
@@ -25,9 +27,10 @@ typedef struct xWindow
     const char *title;
     uint32_t fcolor;
     uint32_t bcolor;
-
-    XImage *image;
     uint32_t *buffer;
+    double target_fps;
+    double delta_time;
+    struct timespec last_time;
 } xWindow;
 
 // Initialize the window struct with default values
@@ -46,10 +49,13 @@ static inline void xInit(xWindow *w)
     w->bcolor = 0xFFFFFF;
     w->image = NULL;
     w->buffer = NULL;
+    w->target_fps = 60.0;
+    w->delta_time = 0.0;
+    clock_gettime(CLOCK_MONOTONIC, &w->last_time);
 }
 
 // Window Management
-static inline bool xCreateWindow(xWindow *w) 
+static inline bool xCreateWindow(xWindow *w)
 {
     if (!w->display) return false;
 
@@ -86,16 +92,50 @@ static inline bool xCreateWindow(xWindow *w)
         w->width, w->height, 32, 0
     );
 
+    clock_gettime(CLOCK_MONOTONIC, &w->last_time);
     return true;
 }
 
-static inline void xDestroyWindow(xWindow *w) 
+static inline void xDestroyWindow(xWindow *w)
 {
     if (!w->display || !w->window) return;
     if (w->image) XDestroyImage(w->image); // This also frees w->buffer
     XDestroyWindow(w->display, w->window);
     XSync(w->display, False);
     w->window = 0;
+}
+
+static inline void xFrameSync(xWindow *w)
+{
+    struct timespec current_time;
+    clock_gettime(CLOCK_MONOTONIC, &current_time);
+
+    // Calculate delta time in seconds
+    double elapsed = (current_time.tv_sec - w->last_time.tv_sec) +
+                    (current_time.tv_nsec - w->last_time.tv_nsec) / 1e9;
+
+    // Frame limiting
+    const double target_frame_time = 1.0 / w->target_fps;
+    if (elapsed < target_frame_time) {
+        const double sleep_time = target_frame_time - elapsed;
+        struct timespec sleep_spec;
+        sleep_spec.tv_sec = (time_t)sleep_time;
+        sleep_spec.tv_nsec = (long)((sleep_time - sleep_spec.tv_sec) * 1e9);
+        nanosleep(&sleep_spec, NULL);
+
+        clock_gettime(CLOCK_MONOTONIC, &current_time);
+        elapsed = (current_time.tv_sec - w->last_time.tv_sec) +
+                 (current_time.tv_nsec - w->last_time.tv_nsec) / 1e9;
+    }
+
+    w->delta_time = elapsed;
+    w->last_time = current_time;
+}
+
+// Get current FPS
+static inline double xGetFPS(const xWindow *w)
+{
+    return (w->delta_time > 0.0) ? (1.0 / w->delta_time) : 0.0;
 }
 
 // Drawing
@@ -148,15 +188,15 @@ static inline void xDrawRectangle(
 }
 
 // Input
-typedef enum xKey 
+typedef enum xKey
 {
     Unknown = 0,
 
-    Escape, Space, 
-    Enter, Tab, 
+    Escape, Space,
+    Enter, Tab,
     Backspace,
 
-    Left, Right, 
+    Left, Right,
     Up, Down,
 
     A,B,C,D,
@@ -172,10 +212,10 @@ typedef enum xKey
     Num4,Num5,Num6,
     Num7,Num8,Num9,
 
-    LeftShift, RightShift, 
+    LeftShift, RightShift,
     LeftControl, RightControl,
 
-    LeftAlt, RightAlt, 
+    LeftAlt, RightAlt,
     LeftSuper, RightSuper,
 
     F1, F2,
@@ -205,12 +245,12 @@ static inline bool xPollEvents(
     const Atom wmDeleteMessage = XInternAtom(display, "WM_DELETE_WINDOW", False);
     bool shouldClose = false;
 
-    while (XPending(display) > 0) 
+    while (XPending(display) > 0)
     {
         XEvent event;
         XNextEvent(display, &event);
 
-        switch (event.type) 
+        switch (event.type)
         {
             case ClientMessage:
                 if ((Atom)event.xclient.data.l[0] == wmDeleteMessage) shouldClose = true;
@@ -223,7 +263,7 @@ static inline bool xPollEvents(
                 KeySym sym = XLookupKeysym(&event.xkey, 0);
                 xKey k = Unknown;
 
-                switch (sym) 
+                switch (sym)
                 {
                     case XK_Escape: k = Escape; break;
                     case XK_space: k = Space; break;
@@ -314,7 +354,7 @@ static inline bool xIsKeyReleased(
     return (idx < KEY_COUNT) ? (!s_curr[idx] && s_prev[idx]) : false;
 }
 
-static inline void xUpdateInput(void) 
+static inline void xUpdateInput(void)
 {
 #ifndef __cplusplus
     for (size_t i = 0; i < KEY_COUNT; ++i) s_prev[i] = s_curr[i];

@@ -127,14 +127,12 @@ int main()
         if (pit < -89.0f) pit = -89.0f;
 
         // Camera front vector
-        const float sin_pitch = sinf(pit * M_PI / 180.0f);
-        const float cos_pitch = cosf(pit * M_PI / 180.0f);
-        const float sin_yaw   = sinf(yaw * M_PI / 180.0f);
-        const float cos_yaw   = cosf(yaw * M_PI / 180.0f);
+        const float sin_pit = sinf(pit * M_PI / 180.0f);
+        const float cos_pit = cosf(pit * M_PI / 180.0f);
+        const float sin_yaw = sinf(yaw * M_PI / 180.0f);
+        const float cos_yaw = cosf(yaw * M_PI / 180.0f);
 
-        xDrawRectangle(&win, 0, 0, win.width, win.height, 0xFFFFFF);
-
-        Vec3 front = {cos_yaw * cos_pitch, sin_pitch, sin_yaw * cos_pitch};
+        Vec3 front = {cos_yaw * cos_pit, sin_pit, sin_yaw * cos_pit};
         front = norm(front);
 
         const Vec3 right = norm(cross(front, vec3(0, 1, 0)));
