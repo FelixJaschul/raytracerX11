@@ -28,9 +28,9 @@ typedef struct xWindow
     uint32_t fcolor;
     uint32_t bcolor;
     uint32_t *buffer;
-    double target_fps;
-    double delta_time;
-    struct timespec last_time;
+    double fps;
+    double deltat;
+    struct timespec lastt;
 } xWindow;
 
 // Initialize the window struct with default values
@@ -49,9 +49,9 @@ static inline void xInit(xWindow *w)
     w->bcolor = 0xFFFFFF;
     w->image = NULL;
     w->buffer = NULL;
-    w->target_fps = 60.0;
-    w->delta_time = 0.0;
-    clock_gettime(CLOCK_MONOTONIC, &w->last_time);
+    w->fps = 60.0;
+    w->deltat = 0.0;
+    clock_gettime(CLOCK_MONOTONIC, &w->lastt);
 }
 
 // Window Management
@@ -92,7 +92,7 @@ static inline bool xCreateWindow(xWindow *w)
         w->width, w->height, 32, 0
     );
 
-    clock_gettime(CLOCK_MONOTONIC, &w->last_time);
+    clock_gettime(CLOCK_MONOTONIC, &w->lastt);
     return true;
 }
 
@@ -111,11 +111,11 @@ static inline void xUpdateFrame(xWindow *w)
     clock_gettime(CLOCK_MONOTONIC, &current_time);
 
     // Calculate delta time in seconds
-    double elapsed = (current_time.tv_sec - w->last_time.tv_sec) +
-                    (current_time.tv_nsec - w->last_time.tv_nsec) / 1e9;
+    double elapsed = (current_time.tv_sec - w->lastt.tv_sec) +
+                    (current_time.tv_nsec - w->lastt.tv_nsec) / 1e9;
 
     // Frame limiting
-    const double target_frame_time = 1.0 / w->target_fps;
+    const double target_frame_time = 1.0 / w->fps;
     if (elapsed < target_frame_time) {
         const double sleep_time = target_frame_time - elapsed;
         struct timespec sleep_spec;
@@ -124,18 +124,18 @@ static inline void xUpdateFrame(xWindow *w)
         nanosleep(&sleep_spec, NULL);
 
         clock_gettime(CLOCK_MONOTONIC, &current_time);
-        elapsed = (current_time.tv_sec - w->last_time.tv_sec) +
-                 (current_time.tv_nsec - w->last_time.tv_nsec) / 1e9;
+        elapsed = (current_time.tv_sec - w->lastt.tv_sec) +
+                 (current_time.tv_nsec - w->lastt.tv_nsec) / 1e9;
     }
 
-    w->delta_time = elapsed;
-    w->last_time = current_time;
+    w->deltat = elapsed;
+    w->lastt = current_time;
 }
 
 // Get current FPS
 static inline double xGetFPS(const xWindow *w)
 {
-    return (w->delta_time > 0.0) ? (1.0 / w->delta_time) : 0.0;
+    return (w->deltat > 0.0) ? (1.0 / w->deltat) : 0.0;
 }
 
 // Drawing
