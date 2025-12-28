@@ -132,6 +132,8 @@ int main()
         const float sin_yaw   = sinf(yaw * M_PI / 180.0f);
         const float cos_yaw   = cosf(yaw * M_PI / 180.0f);
 
+        xDrawRectangle(&win, 0, 0, win.width, win.height, 0xFFFFFF);
+
         Vec3 front = {cos_yaw * cos_pitch, sin_pitch, sin_yaw * cos_pitch};
         front = norm(front);
 
