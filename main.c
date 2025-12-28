@@ -99,7 +99,6 @@ int main()
     Vec3 camera_pos = vec3(0, 2, 5);
     float yaw = -90.0f;
     float pit = 0.0f;
-
     sInit();
 
     const float viewport_height = 2.0f;

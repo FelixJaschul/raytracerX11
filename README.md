@@ -1,4 +1,5 @@
-#### EXTENSION TO WRAPPER FOR X11 
+#### EXTENSION TO WRAPPER FOR X11
+- inspired by: https://youtu.be/Kyrq0fGnokE?si=bXRQEtq9jEoILYgj
 - to show what can be done easily
 - actual wrapper: https://github.com/felixjaschul/wrapperX11
 - real engine is under :
