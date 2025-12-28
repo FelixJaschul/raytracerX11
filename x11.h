@@ -105,7 +105,7 @@ static inline void xDestroyWindow(xWindow *w)
     w->window = 0;
 }
 
-static inline void xFrameSync(xWindow *w)
+static inline void xUpdateFrame(xWindow *w)
 {
     struct timespec current_time;
     clock_gettime(CLOCK_MONOTONIC, &current_time);

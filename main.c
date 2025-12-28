@@ -159,6 +159,7 @@ int main()
         }
 
         xUpdateFramebuffer(&win);
+        xUpdateFrame(&win);
         xUpdateInput();
     }
 
