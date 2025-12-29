@@ -94,6 +94,7 @@ int main()
     xWindow win;
     xInit(&win);
     win.title = XTITLE;
+    win.fps = XFPS;
     xCreateWindow(&win);
 
     Vec3 camera_pos = vec3(0, 2, 5);
