@@ -152,7 +152,7 @@ void scene_init()
 }
 
 // Ray-triangle intersection
-bool intersect_triangle(const Ray ray, const Triangle tri, Model* model, HitRecord *rec)
+bool intersect_triangle(const Ray ray, const Triangle tri, const Model* model, HitRecord *rec)
 {
     const Vec3 v0 = transform_vertex(tri.v0, model);
     const Vec3 v1 = transform_vertex(tri.v1, model);
@@ -217,7 +217,7 @@ Vec3 compute_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir, 
     const Vec3 diffuse = mul(mat.color, diff * DIFFUSE_STRENGTH);
 
     const Vec3 reflect_dir = reflect(mul(light_dir, -1.0f), normal);
-    float dot_vr = fmaxf(dot(view_dir, reflect_dir), 0.0f);
+    const float dot_vr = fmaxf(dot(view_dir, reflect_dir), 0.0f);
 
     float spec = dot_vr;
     spec *= spec; spec *= spec; spec *= spec; spec *= spec; spec *= spec;
