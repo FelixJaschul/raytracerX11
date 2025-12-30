@@ -24,7 +24,7 @@
 #define EPSILON 0.001f
 #define AMBIENT_STRENGTH 0.2f
 #define DIFFUSE_STRENGTH 0.6f
-#define MAX_BOUNCES 3
+#define MAX_BOUNCES 2
 #define MAX_MODELS 100
 
 typedef struct {
@@ -35,51 +35,50 @@ typedef struct {
     xMaterial mat;
 } HitRecord;
 
+#include "xBvd.h"
+
 xModel scene_models[MAX_MODELS];
 int num_models = 0;
+BVHNode *bvh_root = NULL;
 
 // Scene setup
 void scene_init()
 {
     #define TOGGLE_REFLECTIVITY 1
-    xModel *cube_red = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 0.0f, 0.0f), 0.3f * TOGGLE_REFLECTIVITY);
-    xModelLoad(cube_red, "res/cube.obj");
-    xModelTransform(cube_red, vec3(0.0f, 1.0f, 0.0f), vec3(0, 0, 0), vec3(1.0f, 1.0f, 1.0f));
+    #define WALL_REFLECTIVITY (0.3f * TOGGLE_REFLECTIVITY)
 
-    xModel *cube_blue = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(0.0f, 0.0f, 1.0f), 0.5f  * TOGGLE_REFLECTIVITY);
-    xModelLoad(cube_blue, "res/cube.obj");
-    xModelTransform(cube_blue, vec3(2.0f, 2.0f, 0.0f), vec3(0, M_PI/4, 0), vec3(0.5f, 0.5f, 0.5f));
-
-    xModel *cube_green = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(0.0f, 1.0f, 0.0f), 0.2f  * TOGGLE_REFLECTIVITY);
-    xModelLoad(cube_green, "res/cube.obj");
-    xModelTransform(cube_green, vec3(-2.0f, 1.5f, -1.0f), vec3(M_PI/6, M_PI/3, 0), vec3(0.8f, 0.8f, 0.8f));
-
-    #define WALL_REFLECTIVITY (0.0f * TOGGLE_REFLECTIVITY)
-    xModel *floor = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), WALL_REFLECTIVITY);
+    xModel *floor = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(0.0f, 0.0f, 1.0f), WALL_REFLECTIVITY);
     xModelLoad(floor, "res/rect.obj");
-    xModelTransform(floor, vec3(-5.0f, 0.0f, 5.0f), vec3(-M_PI/2, 0, 0), vec3(10.0f, 10.0f, 100.0f));
+    xModelTransform(floor, vec3(-2.0f, 0.0f, 2.0f), vec3(-M_PI/2, 0, 0), vec3(4.0f, 4.0f, 1.0f));
 
-    xModel *ceil = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), WALL_REFLECTIVITY);
+    /*xModel *ceil = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), 0.0f);
     xModelLoad(ceil, "res/rect.obj");
-    xModelTransform(ceil, vec3(-5.0f, 3.0f, -5.0f), vec3(M_PI/2, 0, 0), vec3(10.0f, 10.0f, 100.0f));
+    xModelTransform(ceil, vec3(-2.0f, 4.0f, -2.0f), vec3(M_PI/2, 0, 0), vec3(4.0f, 4.0f, 1.0f));*/
 
-    xModel *left_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), WALL_REFLECTIVITY);
+    xModel *left_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 0.0f, 0.0f), WALL_REFLECTIVITY);
     xModelLoad(left_wall, "res/rect.obj");
-    xModelTransform(left_wall, vec3(-5.0f, 0.0f, 5.0f), vec3(0, -M_PI/2, 0), vec3(10.0f, 3.0f, 1.0f));
+    xModelTransform(left_wall, vec3(-2.0f, 0.0f, 2.0f), vec3(0, -M_PI/2, 0), vec3(4.0f, 4.0f, 1.0f));
 
-    xModel *right_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), WALL_REFLECTIVITY);
+    /*xModel *right_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), 0.0f);
     xModelLoad(right_wall, "res/rect.obj");
-    xModelTransform(right_wall, vec3(5.0f, 0.0f, -5.0f), vec3(0, M_PI/2, 0), vec3(10.0f, 3.0f, 1.0f));
+    xModelTransform(right_wall, vec3(2.0f, 0.0f, -2.0f), vec3(0, M_PI/2, 0), vec3(4.0f, 4.0f, 1.0f));*/
 
-    xModel *front_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), WALL_REFLECTIVITY);
+    xModel *front_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(0.0f, 1.0f, 0.0f), WALL_REFLECTIVITY);
     xModelLoad(front_wall, "res/rect.obj");
-    xModelTransform(front_wall, vec3(-5.0f, 0.0f, -5.0f), vec3(0, 0, 0), vec3(10.0f, 3.0f, 1.0f));
+    xModelTransform(front_wall, vec3(-2.0f, 0.0f, -2.0f), vec3(0, 0, 0), vec3(4.0f, 4.0f, 1.0f));
 
-    xModel *back_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), WALL_REFLECTIVITY);
+    /*xModel *back_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), 0.0f);
     xModelLoad(back_wall, "res/rect.obj");
-    xModelTransform(back_wall, vec3(5.0f, 0.0f, 5.0f), vec3(0, M_PI, 0), vec3(10.0f, 3.0f, 1.0f));
+    xModelTransform(back_wall, vec3(2.0f, 0.0f, 2.0f), vec3(0, M_PI, 0), vec3(4.0f, 4.0f, 1.0f)); */
+
+    xModel *bunni = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), 0.3f * TOGGLE_REFLECTIVITY);
+    xModelLoad(bunni, "res/bunni.obj");
+    xModelTransform(bunni, vec3(0.0f, -0.33f, 0.0f), vec3(0, 0, 0), vec3(10.0f, 10.0f, 10.0f));
 
     xModelUpdate(scene_models, num_models);
+
+    // Build BVH after all models are loaded and transformed
+    bvh_root = bvh_build(scene_models, num_models);
 }
 
 // Ray-triangle intersection
@@ -118,10 +117,49 @@ bool intersect_triangle(const Ray ray, const xTriangle tri, const xMaterial mat,
     return true;
 }
 
+// Traverse BVH and find closest intersection
+bool trace_bvh(const BVHNode *node, const Ray ray, HitRecord *closest_rec)
+{
+    if (!node) return false;
+
+    // Test ray against node's bounding box
+    if (!aabb_intersect(node->bounds, ray, EPSILON, closest_rec->t))
+    {
+        return false;
+    }
+
+    bool hit_anything = false;
+
+    if (node->is_leaf)
+    {
+        // Test all triangles in leaf node
+        for (int i = 0; i < node->num_triangles; i++)
+        {
+            if (intersect_triangle(ray, node->triangles[i], node->materials[i], closest_rec))
+            {
+                hit_anything = true;
+            }
+        }
+    }
+    else
+    {
+        // Traverse children
+        hit_anything |= trace_bvh(node->left, ray, closest_rec);
+        hit_anything |= trace_bvh(node->right, ray, closest_rec);
+    }
+
+    return hit_anything;
+}
+
 bool trace_scene(const Ray ray, HitRecord *closest_rec)
 {
     closest_rec->hit = false;
     closest_rec->t = FLT_MAX;
+
+    if (bvh_root)
+    {
+        return trace_bvh(bvh_root, ray, closest_rec);
+    }
 
     for (int i = 0; i < num_models; i++)
     {
@@ -137,7 +175,7 @@ bool trace_scene(const Ray ray, HitRecord *closest_rec)
 
 Vec3 calculate_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir, const xMaterial mat)
 {
-    const Vec3 light_pos = vec3(0.0f, 5.0f, 3.0f);
+    const Vec3 light_pos = vec3(0.0f, 3.8f, 0.0f);
     const Vec3 light_vec = sub(light_pos, point);
     const float light_len_sq = dot(light_vec, light_vec);
     const float light_len = sqrtf(light_len_sq);
@@ -202,7 +240,7 @@ int main()
     // Initialize camera
     xCamera camera;
     xCameraInit(&camera);
-    camera.position = vec3(2.0f, 2.0f, 0.6f);
+    camera.position = vec3(0.0f, 2.0f, 5.0f);
     camera.yaw = -90.0f;
 
     // Load scene
@@ -222,6 +260,7 @@ int main()
     // Main loop
     while (1)
     {
+        printf("FPS: %.2f\n", xGetFPS(&win));
         const float move_speed = 0.03f;
 
         // Poll events with explicit input state
@@ -261,6 +300,8 @@ int main()
     }
 
     // Cleanup
+    bvh_free(bvh_root);
+
     free(u_offsets);
     free(v_offsets);
 
