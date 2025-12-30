@@ -175,7 +175,7 @@ Vec3 calculate_ray_color(const Ray ray, const int depth)
     return vec3(0.0f, 0.0f, 0.0f);
 }
 
-static inline uint32_t vec3_to_uint32(const Vec3 color)
+static inline uint32_t uint32(const Vec3 color)
 {
     const float r = CLAMP(color.x, 0.0f, 1.0f);
     const float g = CLAMP(color.y, 0.0f, 1.0f);
@@ -249,7 +249,7 @@ int main()
                 rd = norm(rd);
                 const Ray ray = {camera.position, rd};
                 const Vec3 color = calculate_ray_color(ray, MAX_BOUNCES);
-                win.buffer[y * win.width + x] = vec3_to_uint32(color);
+                win.buffer[y * win.width + x] = uint32(color);
             }
         }
 
