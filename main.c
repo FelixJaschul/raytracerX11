@@ -15,7 +15,7 @@
 #include "wrapperX11/x11.h"
 
 #define XTITLE "Raytracer X11"
-#define XFPS 60
+#define XFPS 120
 #define SENS_X 0.40f
 #define SENS_Y 0.15f
 
@@ -24,7 +24,7 @@
 #define EPSILON 0.001f
 #define AMBIENT_STRENGTH 0.2f
 #define DIFFUSE_STRENGTH 0.6f
-#define MAX_BOUNCES 3
+#define MAX_BOUNCES 2
 #define MAX_MODELS 10
 
 typedef struct {
@@ -111,18 +111,16 @@ bool trace_bvh(const BVHNode *node, const Ray ray, HitRecord *closest_rec)
     if (!node) return false;
 
     // Test ray against node's bounding box
-    /*if (!aabb_intersect(node->bounds, ray, EPSILON, closest_rec->t))
-    {
-        return false;
-    }*/
+    if (!aabb_intersect(node->bounds, ray, EPSILON, closest_rec->t)) return false;
 
     bool hit_anything = false;
 
     if (node->is_leaf)
     {
         for (int i = 0; i < node->num_triangles; i++)
-            if (intersect_triangle(ray, node->triangles[i], node->materials[i], closest_rec))
-                hit_anything = true;
+        {
+            if (intersect_triangle(ray, node->triangles[i], node->materials[i], closest_rec)) hit_anything = true;
+        }
     }
     else
     {
@@ -134,6 +132,7 @@ bool trace_bvh(const BVHNode *node, const Ray ray, HitRecord *closest_rec)
     return hit_anything;
 }
 
+// Fallback if trace_bvh failes
 bool trace_scene(const Ray ray, HitRecord *closest_rec)
 {
     closest_rec->hit = false;
