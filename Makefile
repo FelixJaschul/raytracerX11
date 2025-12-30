@@ -1,18 +1,50 @@
-all: clean build run
+# Makefile for raytracerX11
+# Cross-platform build for Linux, macOS, and WSL
+
+CC = clang
+CFLAGS = -O3 -fopenmp -Wall -Wextra -march=native
+LDFLAGS =
+LIBS = -lX11 -lm
+TARGET = main
+SRC = main.c
+
+# Platform detection
+UNAME_S := $(shell uname -s)
+
+ifeq ($(UNAME_S),Darwin)
+    # macOS with Homebrew LLVM (for OpenMP support)
+    CC = /opt/homebrew/opt/llvm/bin/clang
+    CFLAGS += -I/opt/X11/include -I/opt/homebrew/include
+    LDFLAGS += -L/opt/X11/lib -L/opt/homebrew/lib
+    LIBS += -lomp
+else ifeq ($(UNAME_S),Linux)
+    # Linux (native GCC or Clang)
+    CC = gcc
+    CFLAGS += -fopenmp
+    LIBS += -lgomp
+else
+    # WSL or other Unix-like
+    CC = gcc
+    CFLAGS += -fopenmp
+    LIBS += -lgomp
+endif
+
+# Build rules
+all: $(TARGET)
+
+$(TARGET): $(SRC)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(SRC) $(LIBS) -o $(TARGET)
+	@echo "Build complete: ./$(TARGET)"
+	@echo "Platform: $(UNAME_S)"
 
 clean:
-	rm -rf main
-	rm -rf .idea
+	rm -f $(TARGET)
+	rm -rf *.dSYM .idea
 
-build:
-	# gcc -O3 -I/opt/X11/include -Xpreprocessor -fopenmp -L/opt/X11/lib -L/opt/homebrew/Cellar/llvm/21.1.8/lib -o main main.c -lX11 -lm -lomp
-	/opt/homebrew/opt/llvm/bin/clang -O3 -I/opt/X11/include -I/opt/homebrew/include -L/opt/X11/lib -L/opt/homebrew/lib -fopenmp main.c -lX11 -lm -lomp -o main
+run: $(TARGET)
+	./$(TARGET)
 
-run:
-	./main
-
-n: clean
-	nvim main.c
+.PHONY: all clean run
 
 # GIT HELPER
 
@@ -27,8 +59,5 @@ add:
 commit:
 	git commit -a -m "$(MESSAGE)"
 
-update-submodule:
+update:
 	git submodule update --remote --merge
-
-
-

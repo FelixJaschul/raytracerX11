@@ -8,7 +8,8 @@
 
 #define XKEYS_IMPLEMENTATION
 #define XMATH_IMPLEMENTATION
-#define XUTIL_IMPLEMENTATION
+#define XCAMERA_IMPLEMENTATION
+#define XMODEL_IMPLEMENTATION
 #include <assert.h>
 
 #include "wrapperX11/x11.h"
