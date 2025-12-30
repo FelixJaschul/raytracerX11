@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <float.h>
 #include <math.h>
+#include <stdio.h>
+#include <string.h>
 #include <x11.h>
 #include <xMath.h>
 
@@ -27,23 +29,20 @@ Material;
 
 typedef struct 
 {
-    Vec3 center;
-    float radius;
-    Material mat;
+    Vec3 v0, v1, v2;
 } 
-Sphere;
+Triangle;
 
-typedef struct 
+typedef struct
 {
-    Vec3 point;
-    Vec3 normal;
-    Vec3 u;
-    Vec3 v;
-    float width;
-    float height;
+    Triangle* triangles;
+    int num_triangles;
+    Vec3 position;
+    float rot_x, rot_y, rot_z;
+    float scale;
     Material mat;
-} 
-Rect;
+}
+Model;
 
 typedef struct 
 {
@@ -55,178 +54,103 @@ typedef struct
 } 
 HitRecord;
 
-#define MAX_SPHERES 1
-#define MAX_RECTS 12
-#define MAX_BOUNCES 3
+#define MAX_MODELS 100
+#define MAX_TRIANGLES 1000
+#define MAX_BOUNCES 2
 
-Sphere scene_spheres[MAX_SPHERES];
-Rect   scene_rects[MAX_RECTS];
+Model scene_models[MAX_MODELS];
+int num_models = 0;
 
-int num_spheres = 0;
-int num_rects   = 0;
-
-void add_sphere(
-    Vec3 center,
-    float radius,
-    Vec3 color,
-    float refl)
+// Rotation matrices
+Vec3 rotate_x(Vec3 v, float a) 
 {
-    if (num_spheres < MAX_SPHERES) 
-        scene_spheres[num_spheres++] = (Sphere) {
-                center, 
-                radius, 
-                {color, refl, SPECULAR_VALUE}
-        };
+    float c = cosf(a), s = sinf(a);
+    return vec3(v.x, v.y * c - v.z * s, v.y * s + v.z * c);
 }
 
-void add_rect(
-    Vec3 point,
-    Vec3 normal,
-    Vec3 u,
-    Vec3 v,
-    float width,
-    float height,
-    Vec3 color,
-    float refl)
+Vec3 rotate_y(Vec3 v, float a) 
 {
-    if (num_rects < MAX_RECTS) 
-        scene_rects[num_rects++] = (Rect) {
-            point, 
-            norm(normal), 
-            norm(u), 
-            norm(v), 
-            width, 
-            height, 
-            {color, refl, SPECULAR_VALUE}
-        };
+    float c = cosf(a), s = sinf(a);
+    return vec3(v.x * c - v.z * s, v.y, v.x * s + v.z * c);
 }
 
-void add_cube(
-    Vec3 center,
-    float x,
-    float y,
-    float z,
-    Vec3 color,
-    float refl)
+Vec3 rotate_z(Vec3 v, float a) 
 {
-    const float half_x = x / 2.0f;
-    const float half_y = y / 2.0f;
-    const float half_z = z / 2.0f;
-    
-    add_rect(vec3(center.x,          center.y - half_y, center.z),          vec3( 0, -1,  0), vec3(1, 0, 0), vec3(0, 0, 1), x, z, color, refl);
-    add_rect(vec3(center.x,          center.y + half_y, center.z),          vec3( 0,  1,  0), vec3(1, 0, 0), vec3(0, 0, 1), x, z, color, refl);
-    add_rect(vec3(center.x - half_x, center.y,          center.z),          vec3(-1,  0,  0), vec3(0, 0, 1), vec3(0, 1, 0), z, y, color, refl);
-    add_rect(vec3(center.x + half_x, center.y,          center.z),          vec3( 1,  0,  0), vec3(0, 0, 1), vec3(0, 1, 0), z, y, color, refl);
-    add_rect(vec3(center.x,          center.y,          center.z - half_z), vec3( 0,  0, -1), vec3(1, 0, 0), vec3(0, 1, 0), x, y, color, refl);
-    add_rect(vec3(center.x,          center.y,          center.z + half_z), vec3( 0,  0,  1), vec3(1, 0, 0), vec3(0, 1, 0), x, y, color, refl);
+    float c = cosf(a), s = sinf(a);
+    return vec3(v.x * c - v.y * s, v.x * s + v.y * c, v.z);
 }
 
-
-void sInit()
+// Transform vertex with model matrix
+Vec3 transform_vertex(Vec3 v, Model* m) 
 {
-    /*
-    add_rect(
-             Vec3 point,            -> Center point 
-             Vec3 normal,           -> Direction the rectangle faces
-             Vec3 u,                -> 1. edge direction (normalized)
-             Vec3 v,                -> 2. edge direction (normalized, perpendicular to u)
-             float width,           -> Size along u direction
-             float height,          -> Size along v direction  
-             Vec3 color,            -> Color RGB (0.0 to 1.0)
-             float refl,            -> Reflectivity (0.0 = no reflection, 1.0 = mirror)
-    )
-    */
+    v = mul(v, m->scale);
+    if (m->rot_z) v = rotate_z(v, m->rot_z);
+    if (m->rot_x) v = rotate_x(v, m->rot_x);
+    if (m->rot_y) v = rotate_y(v, m->rot_y);
+    return add(v, m->position);
+}
 
-    add_rect(
-             vec3( 0.0f,  0.0f,  0.0f), 
-             vec3( 0.0f,  1.0f,  0.0f), 
-             vec3( 1, 0, 0), 
-             vec3( 0, 0, 1), 
-             6.0f, 
-             6.0f, 
-             vec3( 0.2f,  0.2f,  1.0f), 
-             0.30f 
-    );
-
-    add_rect(
-             vec3( 0.0f,  4.0f,  0.0f), 
-             vec3( 0.0f, -1.0f,  0.0f), 
-             vec3( 1, 0, 0), 
-             vec3( 0, 0, 1), 
-             6.0f, 
-             6.0f, 
-             vec3( 1.0f,  1.0f,  1.0f), 
-             0.08f
-    );
-
-    add_rect(
-             vec3(-3.0f,  2.0f,  0.0f), 
-             vec3( 1.0f,  0.0f,  0.0f), 
-             vec3( 0, 0, 1), 
-             vec3( 0, 1, 0), 
-             6.0f, 
-             6.0f, 
-             vec3( 1.0f,  0.2f,  0.2f), 
-             0.08f
-    );
-
-    add_rect(
-             vec3( 3.0f,  2.0f,  0.0f), 
-             vec3(-1.0f,  0.0f,  0.0f), 
-             vec3( 0, 0, 1), 
-             vec3( 0, 1, 0), 
-             6.0f, 
-             6.0f, 
-             vec3( 0.2f,  1.0f,  0.2f), 
-             0.08f
-    );
-
-    add_rect(
-             vec3( 0.0f,  2.0f, -3.0f), 
-             vec3( 0.0f,  0.0f,  1.0f), 
-             vec3( 1, 0, 0), 
-             vec3( 0, 1, 0), 
-             6.0f, 
-             6.0f, 
-             vec3( 1.0f,  1.0f,  1.0f), 
-             0.08f
-    );
-
-    add_rect(
-             vec3( 0.0f,  2.0f, +3.0f), 
-             vec3( 0.0f,  0.0f,  1.0f), 
-             vec3( 1, 0, 0), 
-             vec3( 0, 1, 0), 
-             6.0f, 
-             6.0f, 
-             vec3( 0.5f,  0.0f,  0.8f), 
-             0.08f
-    );
+Model* create(Vec3 color, float refl) 
+{
+    if (num_models >= MAX_MODELS) return NULL;
     
-    add_cube(
-             vec3( 0.0f,  2.0f,  0.0f),
-             1.0f,
-             1.0f,
-             1.0f,
-             vec3( 1.0f,  1.0f,  1.0f),
-             0.80f
-    );
+    Model* m = &scene_models[num_models++];
+    *m = (Model){
+        .position = {0, 0, 0},
+        .scale = 1.0f,
+        .mat = {color, refl, SPECULAR_VALUE}};
+    return m;
+}
+
+void load(Model* m, const char* path) 
+{
+    FILE* f = fopen(path, "r");
+    if (!f) return;
     
-    /*
-    add_sphere(
-             Vec3 center,           -> Pos in 3d space
-             float radius,          -> Size
-             Vec3 color,            -> Color RGB (0.0 to 1.0)
-             float refl,            -> Reflectivity (0.0 = no reflection, 1.0 = mirror)
-    )
-    */ /*
+    Vec3 verts[MAX_TRIANGLES];
+    Triangle tris[MAX_TRIANGLES];
+    int nv = 0, nt = 0;
     
-    add_sphere(
-             vec3( 0.0f,  2.0f,  0.0f), 
-             1.0f, 
-             vec3( 1.0f,  1.0f,  1.0f), 
-             0.8f
-    ); */
+    char buf[256];
+    while (fgets(buf, sizeof(buf), f)) 
+    {
+        if (buf[0] == 'v' && buf[1] == ' ') 
+        {
+            float x, y, z;
+            sscanf(buf + 2, "%f %f %f", &x, &y, &z);
+            verts[nv++] = vec3(x, y, z);
+        }
+        else if (buf[0] == 'f') {
+            int a, b, c;
+            sscanf(buf + 2, "%d %d %d", &a, &b, &c);
+            tris[nt++] = (Triangle){verts[a-1], verts[b-1], verts[c-1]};
+        }
+    }
+    fclose(f);
+    
+    m->triangles = malloc(nt * sizeof(Triangle));
+    memcpy(m->triangles, tris, nt * sizeof(Triangle));
+    m->num_triangles = nt;
+}
+
+void transform(Model* m, Vec3 pos, Vec3 rot, float scale) 
+{
+    m->position = pos;
+    m->rot_x = rot.x;
+    m->rot_y = rot.y;
+    m->rot_z = rot.z;
+    m->scale = scale;
+}
+
+void sInit() 
+{
+    Model* cube1 = create(vec3(1.0f, 0.5f, 0.3f), 0.3f);
+    load(cube1, "cube.obj");
+    transform(cube1, vec3(0, 1, 0), vec3(0, 0, 0), 1.0f);
+    
+    Model* cube2 = create(vec3(0.3f, 0.5f, 1.0f), 0.5f);
+    load(cube2, "cube.obj");
+    transform(cube2, vec3(2, 2, 0), vec3(0, M_PI/4, 0), 0.5f);
 }
 
 // Forward declarations
@@ -245,13 +169,12 @@ int main()
 
     Vec3 camera_pos = vec3(2, 2, 2);
     float yaw = -135.0f;
-    float pit = 0.0f;
+    float pit =    0.0f;
     sInit();
 
     const float viewport_height = 2.0f;
     const float viewport_width = (float)win.width / (float)win.height * viewport_height;
 
-    // Precompute u/v offsets
     float* u_offsets = malloc(win.width * sizeof(float));
     float* v_offsets = malloc(win.height * sizeof(float));
     for (int x = 0; x < win.width; x++) u_offsets[x] = ((float)x / (float)(win.width - 1) - 0.5f) * viewport_width;
@@ -259,8 +182,8 @@ int main()
 
     while (1)
     {
-        const float rspeed = 0.4f;
-        const float mspeed = 0.02f;
+        const float rspeed = 1.9f;
+        const float mspeed = 0.03f;
         if (xPollEvents(win.display)) break;
         if (xIsKeyPressed(Escape))    break;
 
@@ -272,7 +195,6 @@ int main()
         if (pit >  89.0f) pit =  89.0f;
         if (pit < -89.0f) pit = -89.0f;
 
-        // Camera front vector
         const float sin_pit = sinf(pit * M_PI / 180.0f);
         const float cos_pit = cosf(pit * M_PI / 180.0f);
         const float sin_yaw = sinf(yaw * M_PI / 180.0f);
@@ -323,29 +245,66 @@ static inline uint32_t color_to_uint32(Vec3 color)
     return ((int)(r * 255) << 16) | ((int)(g * 255) << 8) | (int)(b * 255);
 }
 
-// Forward declarations
-bool intersect_sphere(Ray ray, Sphere sphere, HitRecord *rec);
-bool intersect_rect(Ray ray, Rect rect, HitRecord *rec);
+bool intersect_triangle(Ray ray, Triangle tri, Model* model, HitRecord *rec)
+{
+    // Transform triangle vertices
+    Vec3 v0 = transform_vertex(tri.v0, model);
+    Vec3 v1 = transform_vertex(tri.v1, model);
+    Vec3 v2 = transform_vertex(tri.v2, model);
+    
+    const Vec3 edge1 = sub(v1, v0);
+    const Vec3 edge2 = sub(v2, v0);
+    const Vec3 h = cross(ray.direction, edge2);
+    const float a = dot(edge1, h);
+    
+    if (fabsf(a) < EPSILON) return false;
+    
+    const float f = 1.0f / a;
+    const Vec3 s = sub(ray.origin, v0);
+    const float u = f * dot(s, h);
+    
+    if (u < 0.0f || u > 1.0f) return false;
+    
+    const Vec3 q = cross(s, edge1);
+    const float v = f * dot(ray.direction, q);
+    
+    if (v < 0.0f || u + v > 1.0f) return false;
+    
+    const float t = f * dot(edge2, q);
+    
+    if (t < EPSILON || t >= rec->t) return false;
+    
+    rec->hit = true;
+    rec->t = t;
+    rec->point = add(ray.origin, mul(ray.direction, t));
+    rec->normal = norm(cross(edge1, edge2));
+    rec->mat = model->mat;
+    return true;
+}
 
 bool trace_scene(Ray ray, HitRecord *closest_rec)
 {
     closest_rec->hit = false;
     closest_rec->t = FLT_MAX;
-    for (int i = 0; i < num_spheres; i++) intersect_sphere(ray, scene_spheres[i], closest_rec);
-    for (int i = 0; i < num_rects;   i++) intersect_rect(ray, scene_rects[i], closest_rec);
+    
+    for (int i = 0; i < num_models; i++)
+    {
+        Model* model = &scene_models[i];
+        for (int j = 0; j < model->num_triangles; j++)
+        {
+            intersect_triangle(ray, model->triangles[j], model, closest_rec);
+        }
+    }
+    
     return closest_rec->hit;
 }
 
-Vec3 compute_lighting(
-    Vec3 point,
-    Vec3 normal,
-    Vec3 view_dir,
-    Material mat)
+Vec3 compute_lighting(Vec3 point, Vec3 normal, Vec3 view_dir, Material mat)
 {
     const Vec3 light_pos = vec3(0.0f, 4.0f, 0.0f);
     const Vec3 light_vec = sub(light_pos, point);
     const float light_dist = len(light_vec);
-    const Vec3 light_dir = vdiv(light_vec, light_dist);
+    const Vec3 light_dir = mul(light_vec, 1.0f / light_dist);
 
     const Vec3 ambient = mul(mat.color, AMBIENT_STRENGTH);
 
@@ -356,13 +315,12 @@ Vec3 compute_lighting(
     const Vec3 reflect_dir = reflect(mul(light_dir, -1.0f), normal);
     float dot_vr = fmaxf(dot(view_dir, reflect_dir), 0.0f);
 
-    // Fast pow^32 using repeated squaring
     float spec = dot_vr;
-    spec *= spec;  // 2
-    spec *= spec;  // 4
-    spec *= spec;  // 8
-    spec *= spec;  // 16
-    spec *= spec;  // 32
+    spec *= spec;
+    spec *= spec;
+    spec *= spec;
+    spec *= spec;
+    spec *= spec;
 
     const Vec3 specular = vec3(spec * mat.specular, spec * mat.specular, spec * mat.specular);
 
@@ -387,61 +345,5 @@ Vec3 ray_color(Ray ray, int depth)
         return color;
     }
     return vec3(0, 0, 0);
-}
-
-bool intersect_sphere(
-    Ray ray,
-    Sphere sphere,
-    HitRecord *rec)
-{
-    const Vec3 oc = sub(ray.origin, sphere.center);
-    const float b = dot(oc, ray.direction);
-    const float c = dot(oc, oc) - sphere.radius * sphere.radius;
-    const float discriminant = b * b - c;
-    if (discriminant < 0) return false;
-
-    const float sqrt_d = sqrtf(discriminant);
-    float t = -b - sqrt_d;
-    if (t < EPSILON)
-    {
-        t = -b + sqrt_d;
-        if (t < EPSILON) return false;
-    }
-
-    if (t >= rec->t) return false;
-
-    rec->hit = true;
-    rec->t = t;
-    rec->point = add(ray.origin, mul(ray.direction, t));
-    rec->normal = vdiv(sub(rec->point, sphere.center), sphere.radius);
-    rec->mat = sphere.mat;
-    return true;
-}
-
-bool intersect_rect(
-    Ray ray,
-    Rect rect,
-    HitRecord *rec)
-{
-    const float denom = dot(rect.normal, ray.direction);
-    if (fabsf(denom) < 0.0001f) return false;
-
-    const float t = dot(sub(rect.point, ray.origin), rect.normal) / denom;
-    if (t < EPSILON || t >= rec->t) return false;
-
-    const Vec3 p = add(ray.origin, mul(ray.direction, t));
-    const Vec3 v_hit = sub(p, rect.point);
-
-    const float u = dot(v_hit, rect.u);
-    const float v = dot(v_hit, rect.v);
-    if (u < -rect.width / 2.0f || u > rect.width / 2.0f) return false;
-    if (v < -rect.height / 2.0f || v > rect.height / 2.0f) return false;
-
-    rec->hit = true;
-    rec->t = t;
-    rec->point = p;
-    rec->normal = rect.normal;
-    rec->mat = rect.mat;
-    return true;
 }
 
