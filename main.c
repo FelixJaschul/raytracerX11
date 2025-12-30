@@ -20,6 +20,7 @@
 #define SENS_Y 0.15f
 
 #define CLAMP(x, low, high) (fmaxf((low), fminf((x), (high))))
+
 #define EPSILON 0.001f
 #define AMBIENT_STRENGTH 0.2f
 #define DIFFUSE_STRENGTH 0.6f
