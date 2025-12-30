@@ -61,11 +61,11 @@ void scene_init()
 
     xModel *ceil = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), WALL_REFLECTIVITY);
     xModelLoad(ceil, "res/rect.obj");
-    xModelTransform(ceil, vec3(-5.0f, 3.0f, 5.0f), vec3(-M_PI/2, 0, 0), vec3(10.0f, 10.0f, 100.0f));
+    xModelTransform(ceil, vec3(-5.0f, 3.0f, -5.0f), vec3(M_PI/2, 0, 0), vec3(10.0f, 10.0f, 100.0f));
 
     xModel *left_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), WALL_REFLECTIVITY);
     xModelLoad(left_wall, "res/rect.obj");
-    xModelTransform(left_wall, vec3(-5.0f, 0.0f, -5.0f), vec3(0, M_PI/2, 0), vec3(10.0f, 3.0f, 1.0f));
+    xModelTransform(left_wall, vec3(-5.0f, 0.0f, 5.0f), vec3(0, -M_PI/2, 0), vec3(10.0f, 3.0f, 1.0f));
 
     xModel *right_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), WALL_REFLECTIVITY);
     xModelLoad(right_wall, "res/rect.obj");
@@ -77,7 +77,7 @@ void scene_init()
 
     xModel *back_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), WALL_REFLECTIVITY);
     xModelLoad(back_wall, "res/rect.obj");
-    xModelTransform(back_wall, vec3(-5.0f, 0.0f, 5.0f), vec3(0, 0, 0), vec3(10.0f, 3.0f, 1.0f));
+    xModelTransform(back_wall, vec3(5.0f, 0.0f, 5.0f), vec3(0, M_PI, 0), vec3(10.0f, 3.0f, 1.0f));
 
     xModelUpdate(scene_models, num_models);
 }
