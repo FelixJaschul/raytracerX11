@@ -23,7 +23,7 @@
 #define EPSILON          0.001f
 #define AMBIENT_STRENGTH 0.2f
 #define DIFFUSE_STRENGTH 0.6f
-#define MAX_BOUNCES      2
+#define MAX_BOUNCES      3
 
 typedef struct {
     bool hit;
@@ -40,17 +40,43 @@ int num_models = 0;
 // Scene setup
 void scene_init() 
 {
-    xModel* cube_red = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 0.0f, 0.0f), 0.3f);
+    xModel *cube_red = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 0.0f, 0.0f), 0.3f);
     xModelLoad(cube_red, "cube.obj");
-    xModelTransform(cube_red, vec3(0.0f, 1.0f, 0.0f), vec3(0, 0, 0), 1.0f);
+    xModelTransform(cube_red, vec3(0.0f, 1.0f, 0.0f), vec3(0, 0, 0), vec3(1.0f, 1.0f, 1.0f));
     
-    xModel* cube_blue = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(0.0f, 0.0f, 1.0f), 0.5f);
+    xModel *cube_blue = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(0.0f, 0.0f, 1.0f), 0.5f);
     xModelLoad(cube_blue, "cube.obj");
-    xModelTransform(cube_blue, vec3(2.0f, 2.0f, 0.0f), vec3(0, M_PI/4, 0), 0.5f);
+    xModelTransform(cube_blue, vec3(2.0f, 2.0f, 0.0f), vec3(0, M_PI/4, 0), vec3(0.5f, 0.5f, 0.5f));
     
-    xModel* cube_green = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(0.0f, 1.0f, 0.0f), 0.2f);
+    xModel *cube_green = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(0.0f, 1.0f, 0.0f), 0.2f);
     xModelLoad(cube_green, "cube.obj");
-    xModelTransform(cube_green, vec3(-2.0f, 1.5f, -1.0f), vec3(M_PI/6, M_PI/3, 0), 0.8f);
+    xModelTransform(cube_green, vec3(-2.0f, 1.5f, -1.0f), vec3(M_PI/6, M_PI/3, 0), vec3(0.8f, 0.8f, 0.8f));
+
+#define WALL_REFLECTIVITY 0.0f
+
+    xModel *floor = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), WALL_REFLECTIVITY);
+    xModelLoad(floor, "rect.obj");
+    xModelTransform(floor, vec3(-5.0f, 0.0f, 5.0f), vec3(-M_PI/2, 0, 0), vec3(10.0f, 10.0f, 100.0f));
+    
+    xModel *ceil = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), WALL_REFLECTIVITY);
+    xModelLoad(ceil, "rect.obj");
+    xModelTransform(ceil, vec3(-5.0f, 3.0f, 5.0f), vec3(-M_PI/2, 0, 0), vec3(10.0f, 10.0f, 100.0f));
+
+    xModel *left_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), WALL_REFLECTIVITY);
+    xModelLoad(left_wall, "rect.obj");
+    xModelTransform(left_wall, vec3(-5.0f, 0.0f, -5.0f), vec3(0, M_PI/2, 0), vec3(10.0f, 3.0f, 1.0f));
+
+    xModel *right_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), WALL_REFLECTIVITY);
+    xModelLoad(right_wall, "rect.obj");
+    xModelTransform(right_wall, vec3(5.0f, 0.0f, -5.0f), vec3(0, M_PI/2, 0), vec3(10.0f, 3.0f, 1.0f));
+
+    xModel *front_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), WALL_REFLECTIVITY);
+    xModelLoad(front_wall, "rect.obj");
+    xModelTransform(front_wall, vec3(-5.0f, 0.0f, -5.0f), vec3(0, 0, 0), vec3(10.0f, 3.0f, 1.0f));
+
+    xModel *back_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), WALL_REFLECTIVITY);
+    xModelLoad(back_wall, "rect.obj");
+    xModelTransform(back_wall, vec3(-5.0f, 0.0f, 5.0f), vec3(0, 0, 0), vec3(10.0f, 3.0f, 1.0f));
 
     xModelUpdate(scene_models, num_models);
 }
