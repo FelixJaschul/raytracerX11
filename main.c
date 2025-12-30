@@ -111,23 +111,18 @@ bool trace_bvh(const BVHNode *node, const Ray ray, HitRecord *closest_rec)
     if (!node) return false;
 
     // Test ray against node's bounding box
-    if (!aabb_intersect(node->bounds, ray, EPSILON, closest_rec->t))
+    /*if (!aabb_intersect(node->bounds, ray, EPSILON, closest_rec->t))
     {
         return false;
-    }
+    }*/
 
     bool hit_anything = false;
 
     if (node->is_leaf)
     {
-        // Test all triangles in leaf node
         for (int i = 0; i < node->num_triangles; i++)
-        {
             if (intersect_triangle(ray, node->triangles[i], node->materials[i], closest_rec))
-            {
                 hit_anything = true;
-            }
-        }
     }
     else
     {
