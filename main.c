@@ -135,7 +135,7 @@ bool trace_scene(const Ray ray, HitRecord *closest_rec)
     return closest_rec->hit;
 }
 
-Vec3 compute_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir, const xMaterial mat)
+Vec3 calculate_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir, const xMaterial mat)
 {
     const Vec3 light_pos = vec3(0.0f, 5.0f, 3.0f);
     const Vec3 light_vec = sub(light_pos, point);
@@ -156,19 +156,19 @@ Vec3 compute_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir, 
     return add(add(ambient, diffuse), specular);
 }
 
-Vec3 ray_color(const Ray ray, const int depth)
+Vec3 calculate_ray_color(const Ray ray, const int depth)
 {
     HitRecord rec;
     if (trace_scene(ray, &rec))
     {
         const Vec3 view_dir = mul(ray.direction, -1.0f);
-        Vec3 color = compute_lighting(rec.point, rec.normal, view_dir, rec.mat);
+        Vec3 color = calculate_lighting(rec.point, rec.normal, view_dir, rec.mat);
 
         if (depth > 1 && rec.mat.reflectivity > 0.0f)
         {
             const Vec3 reflect_dir = reflect(ray.direction, rec.normal);
             const Ray reflect_ray = {rec.point, reflect_dir};
-            const Vec3 reflect_color = ray_color(reflect_ray, depth - 1);
+            const Vec3 reflect_color = calculate_ray_color(reflect_ray, depth - 1);
             color = add(mul(color, 1.0f - rec.mat.reflectivity), mul(reflect_color, rec.mat.reflectivity));
         }
         return color;
@@ -176,7 +176,7 @@ Vec3 ray_color(const Ray ray, const int depth)
     return vec3(0.0f, 0.0f, 0.0f);
 }
 
-static inline uint32_t color_to_uint32(const Vec3 color)
+static inline uint32_t uint32(const Vec3 color)
 {
     const float r = CLAMP(color.x, 0.0f, 1.0f);
     const float g = CLAMP(color.y, 0.0f, 1.0f);
@@ -240,8 +240,8 @@ int main()
                 rd = norm(rd);
 
                 const Ray ray = {camera.position, rd};
-                const Vec3 color = ray_color(ray, MAX_BOUNCES);
-                win.buffer[y * win.width + x] = color_to_uint32(color);
+                const Vec3 color = calculate_ray_color(ray, MAX_BOUNCES);
+                win.buffer[y * win.width + x] = uint32(color);
             }
         }
 
