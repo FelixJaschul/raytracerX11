@@ -1,4 +1,3 @@
-# Cube vertices
 v -0.5 -0.5 -0.5
 v  0.5 -0.5 -0.5
 v  0.5  0.5 -0.5
@@ -8,7 +7,6 @@ v  0.5 -0.5  0.5
 v  0.5  0.5  0.5
 v -0.5  0.5  0.5
 
-# Faces (two triangles per side)
 f 1 2 3
 f 1 3 4
 f 5 6 7

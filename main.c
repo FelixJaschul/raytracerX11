@@ -92,7 +92,7 @@ bool intersect_triangle(const Ray ray, const xTriangle tri, const xMaterial mat,
     const Vec3 h = cross(ray.direction, edge2);
     const float a = dot(edge1, h);
 
-    if (fabsf(a) < EPSILON) return false;
+    if (a < EPSILON) return false;
 
     const float f = 1.0f / a;
     const Vec3 s = sub(ray.origin, v0);
