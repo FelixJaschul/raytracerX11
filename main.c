@@ -140,15 +140,15 @@ void scene_init()
 {
     Model* cube1 = create_model(vec3(1.0f, 0.5f, 0.3f), 0.3f);
     load(cube1, "cube.obj");
-    transform(cube1, vec3(0, 1, 0), vec3(0, 0, 0), 1.0f);
+    transform(cube1, vec3(0.0f, 1.0f, 0.0f), vec3(0, 0, 0), 1.0f);
     
     Model* cube2 = create_model(vec3(0.3f, 0.5f, 1.0f), 0.5f);
     load(cube2, "cube.obj");
-    transform(cube2, vec3(2, 2, 0), vec3(0, M_PI/4, 0), 0.5f);
+    transform(cube2, vec3(2.0f, 2.0f, 0.0f), vec3(0, M_PI/4, 0), 0.5f);
     
     Model* cube3 = create_model(vec3(0.3f, 1.0f, 0.5f), 0.2f);
     load(cube3, "cube.obj");
-    transform(cube3, vec3(-2, 1.5, -1), vec3(M_PI/6, M_PI/3, 0), 0.8f);
+    transform(cube3, vec3(-2.0f, 1.5f, -1.0f), vec3(M_PI/6, M_PI/3, 0), 0.8f);
 }
 
 // Ray-triangle intersection
@@ -160,7 +160,7 @@ bool intersect_triangle(const Ray ray, const Triangle tri, const Model* model, H
     
     const Vec3 edge1 = sub(v1, v0);
     const Vec3 edge2 = sub(v2, v0);
-    const Vec3 h = cross(ray.direction, edge2);
+    const Vec3 h  = cross(ray.direction, edge2);
     const float a = dot(edge1, h);
     
     if (fabsf(a) < EPSILON) return false;
@@ -195,7 +195,7 @@ bool trace_scene(const Ray ray, HitRecord *closest_rec)
     
     for (int i = 0; i < num_models; i++)
     {
-        Model* model = &scene_models[i];
+        const Model* model = &scene_models[i];
         for (int j = 0; j < model->num_triangles; j++)
         {
             intersect_triangle(ray, model->triangles[j], model, closest_rec);
@@ -207,7 +207,7 @@ bool trace_scene(const Ray ray, HitRecord *closest_rec)
 
 Vec3 compute_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir, const xMaterial mat)
 {
-    const Vec3 light_pos = vec3(0.0f, 5.0f, 3.0f);
+    /* const Vec3 light_pos = vec3(0.0f, 5.0f, 3.0f);
     const Vec3 light_vec = sub(light_pos, point);
     const float light_dist = len(light_vec);
     const Vec3 light_dir = mul(light_vec, 1.0f / light_dist);
@@ -224,7 +224,13 @@ Vec3 compute_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir, 
 
     const Vec3 specular = vec3(spec * mat.specular, spec * mat.specular, spec * mat.specular);
 
-    return add(add(ambient, diffuse), specular);
+    return add(add(ambient, diffuse), specular); */
+
+    const Vec3 light_pos = vec3(0.0f, 5.0f, 3.0f);
+    float spec = fmaxf(dot(view_dir, reflect(mul(mul(sub(light_pos, point), 1.0f / len(sub(light_pos, point))), -1.0f), normal)), 0.0f);
+    spec *= spec; spec *= spec; spec *= spec; spec *= spec; spec *= spec;
+
+    return  add(add(mul(mat.color, AMBIENT_STRENGTH), mul(mat.color, fmaxf(dot(normal, mul(sub(light_pos, point), 1.0f / len(sub(light_pos, point)))), 0.0f) * DIFFUSE_STRENGTH)), vec3(spec * mat.specular, spec * mat.specular, spec * mat.specular));
 }
 
 Vec3 ray_color(const Ray ray, const int depth)
@@ -265,6 +271,7 @@ int main()
 
     xCamera camera;
     xCameraInit(&camera);
+    camera.position = vec3(2.0f, 2.0f, 0.6f);
     
     scene_init();
 
