@@ -15,6 +15,9 @@
 #define XTITLE "X11"
 #define XFPS 60
 
+#define SENS_X 0.40f
+#define SENS_Y 0.15f
+
 #define CLAMP(x, low, high) (fmaxf((low), fminf((x), (high))))
 
 #define EPSILON          0.001f
@@ -295,7 +298,7 @@ int main()
         {
             int dx, dy;
             xGetMouseDelta(&dx, &dy);
-            xCameraRotate(&camera, dx * 0.1f, -dy * 0.1f);
+            xCameraRotate(&camera, dx * SENS_X, -dy * SENS_Y);
         }
 
         // Keyboard movement
