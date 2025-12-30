@@ -24,8 +24,8 @@
 #define EPSILON 0.001f
 #define AMBIENT_STRENGTH 0.2f
 #define DIFFUSE_STRENGTH 0.6f
-#define MAX_BOUNCES 2
-#define MAX_MODELS 100
+#define MAX_BOUNCES 3
+#define MAX_MODELS 10
 
 typedef struct {
     bool hit;
@@ -51,25 +51,13 @@ void scene_init()
     xModelLoad(floor, "res/rect.obj");
     xModelTransform(floor, vec3(-2.0f, 0.0f, 2.0f), vec3(-M_PI/2, 0, 0), vec3(4.0f, 4.0f, 1.0f));
 
-    /*xModel *ceil = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), 0.0f);
-    xModelLoad(ceil, "res/rect.obj");
-    xModelTransform(ceil, vec3(-2.0f, 4.0f, -2.0f), vec3(M_PI/2, 0, 0), vec3(4.0f, 4.0f, 1.0f));*/
-
     xModel *left_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 0.0f, 0.0f), WALL_REFLECTIVITY);
     xModelLoad(left_wall, "res/rect.obj");
     xModelTransform(left_wall, vec3(-2.0f, 0.0f, 2.0f), vec3(0, -M_PI/2, 0), vec3(4.0f, 4.0f, 1.0f));
 
-    /*xModel *right_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), 0.0f);
-    xModelLoad(right_wall, "res/rect.obj");
-    xModelTransform(right_wall, vec3(2.0f, 0.0f, -2.0f), vec3(0, M_PI/2, 0), vec3(4.0f, 4.0f, 1.0f));*/
-
     xModel *front_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(0.0f, 1.0f, 0.0f), WALL_REFLECTIVITY);
     xModelLoad(front_wall, "res/rect.obj");
     xModelTransform(front_wall, vec3(-2.0f, 0.0f, -2.0f), vec3(0, 0, 0), vec3(4.0f, 4.0f, 1.0f));
-
-    /*xModel *back_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), 0.0f);
-    xModelLoad(back_wall, "res/rect.obj");
-    xModelTransform(back_wall, vec3(2.0f, 0.0f, 2.0f), vec3(0, M_PI, 0), vec3(4.0f, 4.0f, 1.0f)); */
 
     xModel *bunni = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), 0.3f * TOGGLE_REFLECTIVITY);
     xModelLoad(bunni, "res/bunni.obj");
@@ -92,7 +80,7 @@ bool intersect_triangle(const Ray ray, const xTriangle tri, const xMaterial mat,
     const Vec3 h = cross(ray.direction, edge2);
     const float a = dot(edge1, h);
 
-    if (a < EPSILON) return false;
+    // if (a < EPSILON) return false; // -> Backface Culling
 
     const float f = 1.0f / a;
     const Vec3 s = sub(ray.origin, v0);

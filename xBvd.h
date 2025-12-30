@@ -96,21 +96,21 @@ typedef struct {
 } BVHTriangle;
 
 // Comparison functions for qsort
-static int compare_x(const BVHTriangle *a, const BVHTriangle *b)
+static int compare_x(const void *a, const void *b)
 {
     const BVHTriangle *ta = a;
     const BVHTriangle *tb = b;
     return (ta->center.x > tb->center.x) - (ta->center.x < tb->center.x);
 }
 
-static int compare_y(const BVHTriangle *a, const BVHTriangle *b)
+static int compare_y(const void *a, const void *b)
 {
     const BVHTriangle *ta = a;
     const BVHTriangle *tb = b;
     return (ta->center.y > tb->center.y) - (ta->center.y < tb->center.y);
 }
 
-static int compare_z(const BVHTriangle *a, const BVHTriangle *b)
+static int compare_z(const void *a, const void *b)
 {
     const BVHTriangle *ta = a;
     const BVHTriangle *tb = b;
