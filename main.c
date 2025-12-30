@@ -39,19 +39,20 @@ int num_models = 0;
 // Scene setup
 void scene_init()
 {
-    xModel *cube_red = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 0.0f, 0.0f), 0.3f);
+    #define TOGGLE_REFLECTIVITY 1
+    xModel *cube_red = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 0.0f, 0.0f), 0.3f * TOGGLE_REFLECTIVITY);
     xModelLoad(cube_red, "res/cube.obj");
     xModelTransform(cube_red, vec3(0.0f, 1.0f, 0.0f), vec3(0, 0, 0), vec3(1.0f, 1.0f, 1.0f));
 
-    xModel *cube_blue = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(0.0f, 0.0f, 1.0f), 0.5f);
+    xModel *cube_blue = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(0.0f, 0.0f, 1.0f), 0.5f  * TOGGLE_REFLECTIVITY);
     xModelLoad(cube_blue, "res/cube.obj");
     xModelTransform(cube_blue, vec3(2.0f, 2.0f, 0.0f), vec3(0, M_PI/4, 0), vec3(0.5f, 0.5f, 0.5f));
 
-    xModel *cube_green = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(0.0f, 1.0f, 0.0f), 0.2f);
+    xModel *cube_green = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(0.0f, 1.0f, 0.0f), 0.2f  * TOGGLE_REFLECTIVITY);
     xModelLoad(cube_green, "res/cube.obj");
     xModelTransform(cube_green, vec3(-2.0f, 1.5f, -1.0f), vec3(M_PI/6, M_PI/3, 0), vec3(0.8f, 0.8f, 0.8f));
 
-    #define WALL_REFLECTIVITY 0.0f
+    #define WALL_REFLECTIVITY (0.0f * TOGGLE_REFLECTIVITY)
     xModel *floor = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), WALL_REFLECTIVITY);
     xModelLoad(floor, "res/rect.obj");
     xModelTransform(floor, vec3(-5.0f, 0.0f, 5.0f), vec3(-M_PI/2, 0, 0), vec3(10.0f, 10.0f, 100.0f));
@@ -120,9 +121,11 @@ bool trace_scene(const Ray ray, HitRecord *closest_rec)
     closest_rec->hit = false;
     closest_rec->t = FLT_MAX;
 
-    for (int i = 0; i < num_models; i++) {
+    for (int i = 0; i < num_models; i++)
+    {
         const xModel* model = &scene_models[i];
-        for (int j = 0; j < model->num_triangles; j++) {
+        for (int j = 0; j < model->num_triangles; j++)
+        {
             intersect_triangle(ray, model->transformed_triangles[j], model->mat, closest_rec);
         }
     }
@@ -153,11 +156,13 @@ Vec3 calculate_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir
 Vec3 calculate_ray_color(const Ray ray, const int depth)
 {
     HitRecord rec;
-    if (trace_scene(ray, &rec)) {
+    if (trace_scene(ray, &rec))
+    {
         const Vec3 view_dir = mul(ray.direction, -1.0f);
         Vec3 color = calculate_lighting(rec.point, rec.normal, view_dir, rec.mat);
 
-        if (depth > 1 && rec.mat.reflectivity > 0.0f) {
+        if (depth > 1 && rec.mat.reflectivity > 0.0f)
+        {
             const Vec3 reflect_dir = reflect(ray.direction, rec.normal);
             const Ray reflect_ray = {rec.point, reflect_dir};
             const Vec3 reflect_color = calculate_ray_color(reflect_ray, depth - 1);
@@ -209,13 +214,12 @@ int main()
     float* v_offsets = (float*)malloc(win.height * sizeof(float));
     assert(u_offsets && v_offsets && "Failed to allocate viewport offset buffers");
 
-    for (int x = 0; x < win.width; x++)
-        u_offsets[x] = ((float)x / (float)(win.width - 1) - 0.5f) * viewport_width;
-    for (int y = 0; y < win.height; y++)
-        v_offsets[y] = ((float)(win.height - 1 - y) / (float)(win.height - 1) - 0.5f) * viewport_height;
+    for (int x = 0; x < win.width; x++)  u_offsets[x] = ((float)x / (float)(win.width - 1) - 0.5f) * viewport_width;
+    for (int y = 0; y < win.height; y++) v_offsets[y] = ((float)(win.height - 1 - y) / (float)(win.height - 1) - 0.5f) * viewport_height;
 
     // Main loop
-    while (1) {
+    while (1)
+    {
         const float move_speed = 0.03f;
 
         // Poll events with explicit input state
@@ -251,16 +255,14 @@ int main()
 
         xUpdateFramebuffer(&win);
         xUpdateFrame(&win);
-        xUpdateInput(&input);  // Update input state at end of frame
+        xUpdateInput(&input);
     }
 
     // Cleanup
     free(u_offsets);
     free(v_offsets);
 
-    for (int i = 0; i < num_models; i++) {
-        xModelFree(&scene_models[i]);
-    }
+    for (int i = 0; i < num_models; i++) xModelFree(&scene_models[i]);
 
     xDestroyWindow(&win);
     return 0;
