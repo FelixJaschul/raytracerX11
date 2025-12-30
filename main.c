@@ -242,8 +242,10 @@ int main()
 
         // Render
         #pragma omp parallel for schedule(dynamic) default(none) shared(win, camera, u_offsets, v_offsets)
-        for (int y = 0; y < win.height; y++) {
-            for (int x = 0; x < win.width; x++) {
+        for (int y = 0; y < win.height; y++)
+        {
+            for (int x = 0; x < win.width; x++)
+            {
                 const Ray ray = xCameraGetRay(&camera, u_offsets[x], v_offsets[y]);
                 const Vec3 color = calculate_ray_color(ray, MAX_BOUNCES);
                 win.buffer[y * win.width + x] = uint32(color);
