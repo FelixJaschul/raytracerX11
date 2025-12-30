@@ -39,6 +39,7 @@ typedef struct {
 
 typedef struct {
     Triangle* triangles;
+    Triangle* transformed_triangles;
     int num_triangles;
     Vec3 position;
     float rot_x, rot_y, rot_z;
@@ -121,6 +122,7 @@ void load(Model* m, const char* path)
     fclose(f);
     
     m->triangles = malloc(nt * sizeof(Triangle));
+    m->transformed_triangles = malloc(nt * sizeof(Triangle));
     memcpy(m->triangles, tris, nt * sizeof(Triangle));
     m->num_triangles = nt;
     printf("Loaded %s: %d triangles\n", path, nt);
@@ -133,6 +135,20 @@ void transform(Model* m, const Vec3 pos, const Vec3 rot, const float scale)
     m->rot_y = rot.y;
     m->rot_z = rot.z;
     m->scale = scale;
+}
+
+void update_transformed_vertices()
+{
+    for (int i = 0; i < num_models; i++)
+    {
+        const Model* m = &scene_models[i];
+        for (int j = 0; j < m->num_triangles; j++)
+        {
+            m->transformed_triangles[j].v0 = transform_vertex(m->triangles[j].v0, m);
+            m->transformed_triangles[j].v1 = transform_vertex(m->triangles[j].v1, m);
+            m->transformed_triangles[j].v2 = transform_vertex(m->triangles[j].v2, m);
+        }
+    }
 }
 
 // Scene setup
@@ -149,14 +165,16 @@ void scene_init()
     Model* cube3 = create_model(vec3(0.3f, 1.0f, 0.5f), 0.2f);
     load(cube3, "cube.obj");
     transform(cube3, vec3(-2.0f, 1.5f, -1.0f), vec3(M_PI/6, M_PI/3, 0), 0.8f);
+
+    update_transformed_vertices();
 }
 
 // Ray-triangle intersection
-bool intersect_triangle(const Ray ray, const Triangle tri, const Model* model, HitRecord *rec)
+bool intersect_triangle(const Ray ray, const Triangle tri, const xMaterial mat, HitRecord *rec)
 {
-    const Vec3 v0 = transform_vertex(tri.v0, model);
-    const Vec3 v1 = transform_vertex(tri.v1, model);
-    const Vec3 v2 = transform_vertex(tri.v2, model);
+    const Vec3 v0 = tri.v0;
+    const Vec3 v1 = tri.v1;
+    const Vec3 v2 = tri.v2;
     
     const Vec3 edge1 = sub(v1, v0);
     const Vec3 edge2 = sub(v2, v0);
@@ -184,7 +202,7 @@ bool intersect_triangle(const Ray ray, const Triangle tri, const Model* model, H
     rec->t = t;
     rec->point = add(ray.origin, mul(ray.direction, t));
     rec->normal = norm(cross(edge1, edge2));
-    rec->mat = model->mat;
+    rec->mat = mat;
     return true;
 }
 
@@ -198,7 +216,7 @@ bool trace_scene(const Ray ray, HitRecord *closest_rec)
         const Model* model = &scene_models[i];
         for (int j = 0; j < model->num_triangles; j++)
         {
-            intersect_triangle(ray, model->triangles[j], model, closest_rec);
+            intersect_triangle(ray, model->transformed_triangles[j], model->mat, closest_rec);
         }
     }
     
@@ -207,30 +225,23 @@ bool trace_scene(const Ray ray, HitRecord *closest_rec)
 
 Vec3 compute_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir, const xMaterial mat)
 {
-    /* const Vec3 light_pos = vec3(0.0f, 5.0f, 3.0f);
+    const Vec3 light_pos = vec3(0.0f, 5.0f, 3.0f);
     const Vec3 light_vec = sub(light_pos, point);
-    const float light_dist = len(light_vec);
-    const Vec3 light_dir = mul(light_vec, 1.0f / light_dist);
+    const float light_len_sq = dot(light_vec, light_vec);
+    const float light_len = sqrtf(light_len_sq);
+    const Vec3 light_dir = mul(light_vec, 1.0f / light_len);
 
     const Vec3 ambient = mul(mat.color, AMBIENT_STRENGTH);
     const float diff = fmaxf(dot(normal, light_dir), 0.0f);
     const Vec3 diffuse = mul(mat.color, diff * DIFFUSE_STRENGTH);
 
     const Vec3 reflect_dir = reflect(mul(light_dir, -1.0f), normal);
-    const float dot_vr = fmaxf(dot(view_dir, reflect_dir), 0.0f);
-
-    float spec = dot_vr;
+    float spec = fmaxf(dot(view_dir, reflect_dir), 0.0f);
     spec *= spec; spec *= spec; spec *= spec; spec *= spec; spec *= spec;
 
     const Vec3 specular = vec3(spec * mat.specular, spec * mat.specular, spec * mat.specular);
 
-    return add(add(ambient, diffuse), specular); */
-
-    const Vec3 light_pos = vec3(0.0f, 5.0f, 3.0f);
-    float spec = fmaxf(dot(view_dir, reflect(mul(mul(sub(light_pos, point), 1.0f / len(sub(light_pos, point))), -1.0f), normal)), 0.0f);
-    spec *= spec; spec *= spec; spec *= spec; spec *= spec; spec *= spec;
-
-    return  add(add(mul(mat.color, AMBIENT_STRENGTH), mul(mat.color, fmaxf(dot(normal, mul(sub(light_pos, point), 1.0f / len(sub(light_pos, point)))), 0.0f) * DIFFUSE_STRENGTH)), vec3(spec * mat.specular, spec * mat.specular, spec * mat.specular));
+    return add(add(ambient, diffuse), specular);
 }
 
 Vec3 ray_color(const Ray ray, const int depth)
@@ -341,7 +352,10 @@ int main()
     free(v_offsets);
     
     // Cleanup models
-    for (int i = 0; i < num_models; i++) if (scene_models[i].triangles) free(scene_models[i].triangles);
+    for (int i = 0; i < num_models; i++) {
+        if (scene_models[i].triangles) free(scene_models[i].triangles);
+        if (scene_models[i].transformed_triangles) free(scene_models[i].transformed_triangles);
+    }
 
     xDestroyWindow(&win);
     return 0;
