@@ -27,5 +27,8 @@ add:
 commit:
 	git commit -a -m "$(MESSAGE)"
 
+update-submodule:
+	git submodule update --remote --merge
+
 
 

@@ -1,4 +1,3 @@
-#include <sys/types.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -6,82 +5,68 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
-#include <x11.h>
-#include <xMath.h>
+
+#define XKEYS_IMPLEMENTATION
+#define XMATH_IMPLEMENTATION
+#define XUTIL_IMPLEMENTATION
+
+#include <wrapperX11/x11.h>
 
 #define XTITLE "X11"
 #define XFPS 60
 
 #define CLAMP(x, low, high) (fmaxf((low), fminf((x), (high))))
 
-#define SPECULAR_VALUE   0.0f
 #define EPSILON          0.001f
 #define AMBIENT_STRENGTH 0.2f
 #define DIFFUSE_STRENGTH 0.6f
+#define MAX_BOUNCES      2
 
-typedef struct 
-{
-    Vec3 color;
-    float reflectivity;
-    float specular;
-} 
-Material;
+typedef struct {
+    bool hit;
+    float t;
+    Vec3 point;
+    Vec3 normal;
+    xMaterial mat;
+} HitRecord;
 
-typedef struct 
-{
+typedef struct {
     Vec3 v0, v1, v2;
-} 
-Triangle;
+} Triangle;
 
-typedef struct
-{
+typedef struct {
     Triangle* triangles;
     int num_triangles;
     Vec3 position;
     float rot_x, rot_y, rot_z;
     float scale;
-    Material mat;
-}
-Model;
-
-typedef struct 
-{
-    bool hit;
-    float t;
-    Vec3 point;
-    Vec3 normal;
-    Material mat;
-} 
-HitRecord;
+    xMaterial mat;
+} Model;
 
 #define MAX_MODELS 100
-#define MAX_TRIANGLES 1000
-#define MAX_BOUNCES 2
-
 Model scene_models[MAX_MODELS];
 int num_models = 0;
 
-// Rotation matrices
-Vec3 rotate_x(Vec3 v, float a) 
+// Rotation helpers
+Vec3 rotate_x(const Vec3 v, const float a)
 {
-    float c = cosf(a), s = sinf(a);
+    const float c = cosf(a), s = sinf(a);
     return vec3(v.x, v.y * c - v.z * s, v.y * s + v.z * c);
 }
 
-Vec3 rotate_y(Vec3 v, float a) 
+Vec3 rotate_y(const Vec3 v, const float a)
 {
-    float c = cosf(a), s = sinf(a);
+    const float c = cosf(a), s = sinf(a);
     return vec3(v.x * c - v.z * s, v.y, v.x * s + v.z * c);
 }
 
-Vec3 rotate_z(Vec3 v, float a) 
+Vec3 rotate_z(const Vec3 v, const float a)
 {
-    float c = cosf(a), s = sinf(a);
+    const float c = cosf(a), s = sinf(a);
     return vec3(v.x * c - v.y * s, v.x * s + v.y * c, v.z);
 }
 
-// Transform vertex with model matrix
-Vec3 transform_vertex(Vec3 v, Model* m) 
+Vec3 transform_vertex(Vec3 v, const Model* m)
 {
     v = mul(v, m->scale);
     if (m->rot_z) v = rotate_z(v, m->rot_z);
@@ -90,7 +75,7 @@ Vec3 transform_vertex(Vec3 v, Model* m)
     return add(v, m->position);
 }
 
-Model* create(Vec3 color, float refl) 
+Model* create_model(const Vec3 color, const float refl)
 {
     if (num_models >= MAX_MODELS) return NULL;
     
@@ -98,17 +83,21 @@ Model* create(Vec3 color, float refl)
     *m = (Model){
         .position = {0, 0, 0},
         .scale = 1.0f,
-        .mat = {color, refl, SPECULAR_VALUE}};
+        .mat = {color, refl, 0.0f}
+    };
     return m;
 }
 
-void load(Model* m, const char* path) 
+void load(Model* m, const char* path)
 {
     FILE* f = fopen(path, "r");
-    if (!f) return;
+    if (!f) {
+        printf("Failed to load: %s\n", path);
+        return;
+    }
     
-    Vec3 verts[MAX_TRIANGLES];
-    Triangle tris[MAX_TRIANGLES];
+    Vec3 verts[1000];
+    Triangle tris[1000];
     int nv = 0, nt = 0;
     
     char buf[256];
@@ -131,9 +120,10 @@ void load(Model* m, const char* path)
     m->triangles = malloc(nt * sizeof(Triangle));
     memcpy(m->triangles, tris, nt * sizeof(Triangle));
     m->num_triangles = nt;
+    printf("Loaded %s: %d triangles\n", path, nt);
 }
 
-void transform(Model* m, Vec3 pos, Vec3 rot, float scale) 
+void transform(Model* m, const Vec3 pos, const Vec3 rot, const float scale)
 {
     m->position = pos;
     m->rot_x = rot.x;
@@ -142,115 +132,28 @@ void transform(Model* m, Vec3 pos, Vec3 rot, float scale)
     m->scale = scale;
 }
 
-void sInit() 
+// Scene setup
+void scene_init() 
 {
-    Model* cube1 = create(vec3(1.0f, 0.5f, 0.3f), 0.3f);
+    Model* cube1 = create_model(vec3(1.0f, 0.5f, 0.3f), 0.3f);
     load(cube1, "cube.obj");
     transform(cube1, vec3(0, 1, 0), vec3(0, 0, 0), 1.0f);
     
-    Model* cube2 = create(vec3(0.3f, 0.5f, 1.0f), 0.5f);
+    Model* cube2 = create_model(vec3(0.3f, 0.5f, 1.0f), 0.5f);
     load(cube2, "cube.obj");
     transform(cube2, vec3(2, 2, 0), vec3(0, M_PI/4, 0), 0.5f);
+    
+    Model* cube3 = create_model(vec3(0.3f, 1.0f, 0.5f), 0.2f);
+    load(cube3, "cube.obj");
+    transform(cube3, vec3(-2, 1.5, -1), vec3(M_PI/6, M_PI/3, 0), 0.8f);
 }
 
-// Forward declarations
-Vec3 ray_color(Ray ray, int depth);
-Vec3 compute_lighting(Vec3 point, Vec3 normal, Vec3 view_dir, Material mat);
-bool trace_scene(Ray ray, HitRecord *closest_rec);
-static inline uint32_t color_to_uint32(Vec3 color);
-
-int main()
+// Ray-triangle intersection
+bool intersect_triangle(const Ray ray, const Triangle tri, Model* model, HitRecord *rec)
 {
-    xWindow win;
-    xInit(&win);
-    win.title = XTITLE;
-    win.fps = XFPS;
-    xCreateWindow(&win);
-
-    Vec3 camera_pos = vec3(2, 2, 2);
-    float yaw = -135.0f;
-    float pit =    0.0f;
-    sInit();
-
-    const float viewport_height = 2.0f;
-    const float viewport_width = (float)win.width / (float)win.height * viewport_height;
-
-    float* u_offsets = malloc(win.width * sizeof(float));
-    float* v_offsets = malloc(win.height * sizeof(float));
-    for (int x = 0; x < win.width; x++) u_offsets[x] = ((float)x / (float)(win.width - 1) - 0.5f) * viewport_width;
-    for (int y = 0; y < win.height; y++) v_offsets[y] = ((float)(win.height - 1 - y) / (float)(win.height - 1) - 0.5f) * viewport_height;
-
-    while (1)
-    {
-        const float rspeed = 1.9f;
-        const float mspeed = 0.03f;
-        if (xPollEvents(win.display)) break;
-        if (xIsKeyPressed(Escape))    break;
-
-        if (xIsKeyDown(Left))  yaw -= rspeed;
-        if (xIsKeyDown(Right)) yaw += rspeed;
-        if (xIsKeyDown(Up))    pit += rspeed;
-        if (xIsKeyDown(Down))  pit -= rspeed;
-
-        if (pit >  89.0f) pit =  89.0f;
-        if (pit < -89.0f) pit = -89.0f;
-
-        const float sin_pit = sinf(pit * M_PI / 180.0f);
-        const float cos_pit = cosf(pit * M_PI / 180.0f);
-        const float sin_yaw = sinf(yaw * M_PI / 180.0f);
-        const float cos_yaw = cosf(yaw * M_PI / 180.0f);
-
-        Vec3 front = {cos_yaw * cos_pit, sin_pit, sin_yaw * cos_pit};
-        front = norm(front);
-
-        const Vec3 right = norm(cross(front, vec3(0, 1, 0)));
-        const Vec3 up    = cross(right, front);
-
-        if (xIsKeyDown(W)) camera_pos = add(camera_pos, mul(front, mspeed));
-        if (xIsKeyDown(S)) camera_pos = sub(camera_pos, mul(front, mspeed));
-        if (xIsKeyDown(A)) camera_pos = sub(camera_pos, mul(right, mspeed));
-        if (xIsKeyDown(D)) camera_pos = add(camera_pos, mul(right, mspeed));
-
-        #pragma omp parallel for schedule(dynamic)
-        for (int y = 0; y < win.height; y++)
-        {
-            const Vec3 row_offset = mul(up, v_offsets[y]);
-            for (int x = 0; x < win.width; x++)
-            {
-                Vec3 rd = add(front, add(row_offset, mul(right, u_offsets[x])));
-                rd = norm(rd);
-
-                const Ray ray = {camera_pos, rd};
-                const Vec3 color = ray_color(ray, MAX_BOUNCES);
-                win.buffer[y * win.width + x] = color_to_uint32(color);
-            }
-        }
-
-        xUpdateFramebuffer(&win);
-        xUpdateFrame(&win);
-        xUpdateInput();
-    }
-
-    free(u_offsets);
-    free(v_offsets);
-    xDestroyWindow(&win);
-    return 0;
-}
-
-static inline uint32_t color_to_uint32(Vec3 color)
-{
-    const float r = CLAMP(color.x, 0.0f, 1.0f);
-    const float g = CLAMP(color.y, 0.0f, 1.0f);
-    const float b = CLAMP(color.z, 0.0f, 1.0f);
-    return ((int)(r * 255) << 16) | ((int)(g * 255) << 8) | (int)(b * 255);
-}
-
-bool intersect_triangle(Ray ray, Triangle tri, Model* model, HitRecord *rec)
-{
-    // Transform triangle vertices
-    Vec3 v0 = transform_vertex(tri.v0, model);
-    Vec3 v1 = transform_vertex(tri.v1, model);
-    Vec3 v2 = transform_vertex(tri.v2, model);
+    const Vec3 v0 = transform_vertex(tri.v0, model);
+    const Vec3 v1 = transform_vertex(tri.v1, model);
+    const Vec3 v2 = transform_vertex(tri.v2, model);
     
     const Vec3 edge1 = sub(v1, v0);
     const Vec3 edge2 = sub(v2, v0);
@@ -282,7 +185,7 @@ bool intersect_triangle(Ray ray, Triangle tri, Model* model, HitRecord *rec)
     return true;
 }
 
-bool trace_scene(Ray ray, HitRecord *closest_rec)
+bool trace_scene(const Ray ray, HitRecord *closest_rec)
 {
     closest_rec->hit = false;
     closest_rec->t = FLT_MAX;
@@ -299,35 +202,29 @@ bool trace_scene(Ray ray, HitRecord *closest_rec)
     return closest_rec->hit;
 }
 
-Vec3 compute_lighting(Vec3 point, Vec3 normal, Vec3 view_dir, Material mat)
+Vec3 compute_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir, const xMaterial mat)
 {
-    const Vec3 light_pos = vec3(0.0f, 4.0f, 0.0f);
+    const Vec3 light_pos = vec3(0.0f, 5.0f, 3.0f);
     const Vec3 light_vec = sub(light_pos, point);
     const float light_dist = len(light_vec);
     const Vec3 light_dir = mul(light_vec, 1.0f / light_dist);
 
     const Vec3 ambient = mul(mat.color, AMBIENT_STRENGTH);
-
-    const float dot_nl = dot(normal, light_dir);
-    const float diff = fmaxf(dot_nl, 0.0f);
+    const float diff = fmaxf(dot(normal, light_dir), 0.0f);
     const Vec3 diffuse = mul(mat.color, diff * DIFFUSE_STRENGTH);
 
     const Vec3 reflect_dir = reflect(mul(light_dir, -1.0f), normal);
     float dot_vr = fmaxf(dot(view_dir, reflect_dir), 0.0f);
 
     float spec = dot_vr;
-    spec *= spec;
-    spec *= spec;
-    spec *= spec;
-    spec *= spec;
-    spec *= spec;
+    spec *= spec; spec *= spec; spec *= spec; spec *= spec; spec *= spec;
 
     const Vec3 specular = vec3(spec * mat.specular, spec * mat.specular, spec * mat.specular);
 
     return add(add(ambient, diffuse), specular);
 }
 
-Vec3 ray_color(Ray ray, int depth)
+Vec3 ray_color(const Ray ray, const int depth)
 {
     HitRecord rec;
     if (trace_scene(ray, &rec))
@@ -344,6 +241,98 @@ Vec3 ray_color(Ray ray, int depth)
         }
         return color;
     }
-    return vec3(0, 0, 0);
+    return vec3(0.0f, 0.0f, 0.0f);
 }
 
+static inline uint32_t color_to_uint32(const Vec3 color)
+{
+    const float r = CLAMP(color.x, 0.0f, 1.0f);
+    const float g = CLAMP(color.y, 0.0f, 1.0f);
+    const float b = CLAMP(color.z, 0.0f, 1.0f);
+    return ((int)(r * 255) << 16) | ((int)(g * 255) << 8) | (int)(b * 255);
+}
+
+int main()
+{
+    xWindow win;
+    xWindowInit(&win);
+    win.title = XTITLE;
+    win.fps = XFPS;
+    xCreateWindow(&win);
+
+    xCamera camera;
+    xCameraInit(&camera);
+    
+    scene_init();
+
+    const float viewport_height = 2.0f;
+    const float viewport_width = (float)win.width / (float)win.height * viewport_height;
+
+    // Precompute viewport offsets
+    float* u_offsets = malloc(win.width * sizeof(float));
+    float* v_offsets = malloc(win.height * sizeof(float));
+    for (int x = 0; x < win.width; x++)  u_offsets[x] = ((float)x / (float)(win.width - 1) - 0.5f) * viewport_width;
+    for (int y = 0; y < win.height; y++) v_offsets[y] = ((float)(win.height - 1 - y) / (float)(win.height - 1) - 0.5f) * viewport_height;
+
+    bool mouse_grabbed = false;
+
+    while (1)
+    {
+        const float move_speed = 0.03f;
+        
+        if (xPollEvents(win.display)) break;
+        if (xIsKeyPressed(KEY_ESCAPE)) break;
+
+        // Toggle mouse grab with mouse click
+        if (xIsMousePressed(MOUSE_LEFT) && !mouse_grabbed)
+        {
+            xGrabMouse(win.display, win.window, win.width, win.height);
+            mouse_grabbed = true;
+        }
+
+        // Mouse camera control
+        if (mouse_grabbed)
+        {
+            int dx, dy;
+            xGetMouseDelta(&dx, &dy);
+            xCameraRotate(&camera, dx * 0.1f, -dy * 0.1f);
+        }
+
+        // Keyboard movement
+        if (xIsKeyDown(KEY_W)) xCameraMove(&camera, camera.front, move_speed);
+        if (xIsKeyDown(KEY_S)) xCameraMove(&camera, mul(camera.front, -1), move_speed);
+        if (xIsKeyDown(KEY_A)) xCameraMove(&camera, mul(camera.right, -1), move_speed);
+        if (xIsKeyDown(KEY_D)) xCameraMove(&camera, camera.right, move_speed);
+        if (xIsKeyDown(KEY_Q)) xCameraMove(&camera, vec3(0, -1, 0), move_speed);
+        if (xIsKeyDown(KEY_E)) xCameraMove(&camera, vec3(0, 1, 0), move_speed);
+
+        // Render
+        #pragma omp parallel for schedule(dynamic) default(none) shared(win, camera, u_offsets, v_offsets)
+        for (int y = 0; y < win.height; y++)
+        {
+            const Vec3 row_offset = mul(camera.up, v_offsets[y]);
+            for (int x = 0; x < win.width; x++)
+            {
+                Vec3 rd = add(camera.front, add(row_offset, mul(camera.right, u_offsets[x])));
+                rd = norm(rd);
+
+                const Ray ray = {camera.position, rd};
+                const Vec3 color = ray_color(ray, MAX_BOUNCES);
+                win.buffer[y * win.width + x] = color_to_uint32(color);
+            }
+        }
+
+        xUpdateFramebuffer(&win);
+        xUpdateFrame(&win);
+        xUpdateInput();
+    }
+
+    free(u_offsets);
+    free(v_offsets);
+    
+    // Cleanup models
+    for (int i = 0; i < num_models; i++) if (scene_models[i].triangles) free(scene_models[i].triangles);
+
+    xDestroyWindow(&win);
+    return 0;
+}

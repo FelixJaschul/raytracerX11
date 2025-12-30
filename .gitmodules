@@ -1,0 +1,3 @@
+[submodule "wrapperX11"]
+	path = wrapperX11
+	url = https://github.com/felixjaschul/wrapperX11.git
