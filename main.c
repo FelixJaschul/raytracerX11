@@ -10,9 +10,7 @@
 #define XMATH_IMPLEMENTATION
 #define XCAMERA_IMPLEMENTATION
 #define XMODEL_IMPLEMENTATION
-#include <assert.h>
-
-#include "wrapperX11/x11.h"
+#include <wrapperX11/x11.h>
 
 #define XTITLE "Raytracer X11"
 #define XFPS 120
