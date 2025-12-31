@@ -22,7 +22,7 @@
 #define EPSILON 0.001f
 #define AMBIENT_STRENGTH 0.2f
 #define DIFFUSE_STRENGTH 0.6f
-#define MAX_BOUNCES 10
+#define MAX_BOUNCES 2
 #define MAX_MODELS 10
 
 typedef struct {
