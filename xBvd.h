@@ -1,5 +1,9 @@
-#ifndef XBVD_H
-#define XBVD_H
+// ============================================================================
+// xBvd.h -> BVH implementation
+// ============================================================================
+
+#ifndef XBVH_H
+#define XBVH_H
 
 #include <stdlib.h>
 #include <stdbool.h>
@@ -8,225 +12,232 @@
 extern "C" {
 #endif
 
-// AABB (Axis-Aligned Bounding Box)
-
 typedef struct {
-    Vec3 min;
-    Vec3 max;
+    Vec3 min, max;
 } AABB;
 
-// Create AABB from a triangle
-static inline AABB aabb_from_triangle(const xTriangle tri)
+typedef struct BVHNode {
+    AABB bounds;
+    struct BVHNode *left, *right;
+    xTriangle *tris;
+    xMaterial *mats;
+    int count;
+} BVHNode;
+
+// Inline helpers
+static inline AABB box_tri(const xTriangle t)
 {
-    AABB box;
-    box.min.x = fminf(fminf(tri.v0.x, tri.v1.x), tri.v2.x);
-    box.min.y = fminf(fminf(tri.v0.y, tri.v1.y), tri.v2.y);
-    box.min.z = fminf(fminf(tri.v0.z, tri.v1.z), tri.v2.z);
-    box.max.x = fmaxf(fmaxf(tri.v0.x, tri.v1.x), tri.v2.x);
-    box.max.y = fmaxf(fmaxf(tri.v0.y, tri.v1.y), tri.v2.y);
-    box.max.z = fmaxf(fmaxf(tri.v0.z, tri.v1.z), tri.v2.z);
-    return box;
+    AABB b;
+    b.min.x = fminf(fminf(t.v0.x,t.v1.x),t.v2.x);
+    b.min.y = fminf(fminf(t.v0.y,t.v1.y),t.v2.y);
+    b.min.z = fminf(fminf(t.v0.z,t.v1.z),t.v2.z);
+    b.max.x = fmaxf(fmaxf(t.v0.x,t.v1.x),t.v2.x);
+    b.max.y = fmaxf(fmaxf(t.v0.y,t.v1.y),t.v2.y);
+    b.max.z = fmaxf(fmaxf(t.v0.z,t.v1.z),t.v2.z);
+    return b;
 }
 
-// Merge two AABBs
-static inline AABB aabb_merge(const AABB a, const AABB b)
+static inline AABB box_merge(const AABB a, const AABB b)
 {
-    AABB result;
-    result.min.x = fminf(a.min.x, b.min.x);
-    result.min.y = fminf(a.min.y, b.min.y);
-    result.min.z = fminf(a.min.z, b.min.z);
-    result.max.x = fmaxf(a.max.x, b.max.x);
-    result.max.y = fmaxf(a.max.y, b.max.y);
-    result.max.z = fmaxf(a.max.z, b.max.z);
-    return result;
+    AABB r;
+    r.min.x=fminf(a.min.x,b.min.x); r.min.y=fminf(a.min.y,b.min.y); r.min.z=fminf(a.min.z,b.min.z);
+    r.max.x=fmaxf(a.max.x,b.max.x); r.max.y=fmaxf(a.max.y,b.max.y); r.max.z=fmaxf(a.max.z,b.max.z);
+    return r;
 }
 
-// Ray-AABB intersection test (slab method)
-static inline bool aabb_intersect(const AABB box, const Ray ray, float t_min, float t_max)
+static inline bool box_hit(AABB box, Ray ray, float tmin, float tmax)
 {
-    for (int axis = 0; axis < 3; axis++)
+    for (int i = 0; i < 3; i++)
     {
-        const float inv_d = 1.0f / ((float*)&ray.direction)[axis];
-        float t0 = (((float*)&box.min)[axis] - ((float*)&ray.origin)[axis]) * inv_d;
-        float t1 = (((float*)&box.max)[axis] - ((float*)&ray.origin)[axis]) * inv_d;
-
-        if (inv_d < 0.0f) {
-            float temp = t0;
-            t0 = t1;
-            t1 = temp;
+        const float inv = 1.0f / ((float*)&ray.direction)[i];
+        float t0 = (((float*)&box.min)[i] - ((float*)&ray.origin)[i]) * inv;
+        float t1 = (((float*)&box.max)[i] - ((float*)&ray.origin)[i]) * inv;
+        if (inv < 0)
+        {
+            const float tmp = t0;
+                         t0 = t1;
+                         t1 = tmp;
         }
 
-        t_min = t0 > t_min ? t0 : t_min;
-        t_max = t1 < t_max ? t1 : t_max;
-
-        if (t_max <= t_min) return false;
+        tmin = t0 > tmin ? t0 : tmin;
+        tmax = t1 < tmax ? t1 : tmax;
+        if (tmax <= tmin) return false;
     }
     return true;
 }
 
-// Get AABB center
-static inline Vec3 aabb_center(const AABB box)
-{
-    return vec3(
-        (box.min.x + box.max.x) * 0.5f,
-        (box.min.y + box.max.y) * 0.5f,
-        (box.min.z + box.max.z) * 0.5f
-    );
-}
-
-// BVH (Bounding Volume Hierarchy)
-
-#define BVH_MAX_LEAF_TRIANGLES 4
-
-typedef struct BVHNode {
-    AABB bounds;
-    struct BVHNode *left;
-    struct BVHNode *right;
-    xTriangle *triangles;
-    xMaterial *materials;
-    int num_triangles;
-    bool is_leaf;
-} BVHNode;
-
 typedef struct {
-    xTriangle triangle;
-    xMaterial material;
-    AABB bounds;
-    Vec3 center;
-} BVHTriangle;
+    xTriangle tri; xMaterial mat; Vec3 center;
+} Item;
 
-// Comparison functions for qsort
-static int compare_x(const void *a, const void *b)
+// Straight up ChatGPTed this lol
+static int cmp_x(const void *a, const void *b)
 {
-    const BVHTriangle *ta = a;
-    const BVHTriangle *tb = b;
-    return (ta->center.x > tb->center.x) - (ta->center.x < tb->center.x);
+    return (((Item*)a)->center.x > ((Item*)b)->center.x) - (((Item*)a)->center.x < ((Item*)b)->center.x);
+}
+static int cmp_y(const void *a, const void *b)
+{
+    return (((Item*)a)->center.y > ((Item*)b)->center.y) - (((Item*)a)->center.y < ((Item*)b)->center.y);
+}
+static int cmp_z(const void *a, const void *b)
+{
+    return (((Item*)a)->center.z > ((Item*)b)->center.z) - (((Item*)a)->center.z < ((Item*)b)->center.z);
 }
 
-static int compare_y(const void *a, const void *b)
-{
-    const BVHTriangle *ta = a;
-    const BVHTriangle *tb = b;
-    return (ta->center.y > tb->center.y) - (ta->center.y < tb->center.y);
-}
-
-static int compare_z(const void *a, const void *b)
-{
-    const BVHTriangle *ta = a;
-    const BVHTriangle *tb = b;
-    return (ta->center.z > tb->center.z) - (ta->center.z < tb->center.z);
-}
-
-// Build BVH recursively
-static BVHNode* bvh_build_recursive(BVHTriangle *tris, const int num_tris)
+static BVHNode* build(Item *items, const int n)
 {
     BVHNode *node = malloc(sizeof(BVHNode));
+    node->bounds = box_tri(items[0].tri);
+    for (int i = 1; i < n; i++) node->bounds = box_merge(node->bounds, box_tri(items[i].tri));
 
-    // Compute bounds for this node
-    node->bounds = tris[0].bounds;
-    for (int i = 1; i < num_tris; i++)
+    if (n <= 4)
     {
-        node->bounds = aabb_merge(node->bounds, tris[i].bounds);
-    }
-
-    // Leaf node condition
-    if (num_tris <= BVH_MAX_LEAF_TRIANGLES)
-    {
-        node->is_leaf = true;
-        node->num_triangles = num_tris;
-        node->triangles = (xTriangle*)malloc(num_tris * sizeof(xTriangle));
-        node->materials = (xMaterial*)malloc(num_tris * sizeof(xMaterial));
-
-        for (int i = 0; i < num_tris; i++)
-        {
-            node->triangles[i] = tris[i].triangle;
-            node->materials[i] = tris[i].material;
-        }
-
-        node->left = NULL;
-        node->right = NULL;
+        node->count = n;
+        node->tris = malloc(n * sizeof(xTriangle));
+        node->mats = malloc(n * sizeof(xMaterial));
+        for (int i = 0; i < n; i++) { node->tris[i] = items[i].tri; node->mats[i] = items[i].mat; }
+        node->left = node->right = NULL;
         return node;
     }
 
-    // Interior node - split along longest axis
     Vec3 extent = sub(node->bounds.max, node->bounds.min);
-    int axis = 0;
-    if (extent.y > extent.x) axis = 1;
+    int axis = (extent.y > extent.x) ? 1 : 0;
     if (extent.z > ((float*)&extent)[axis]) axis = 2;
 
-    // Sort triangles along chosen axis
-    if (axis == 0) qsort(tris, num_tris, sizeof(BVHTriangle), compare_x);
-    else if (axis == 1) qsort(tris, num_tris, sizeof(BVHTriangle), compare_y);
-    else qsort(tris, num_tris, sizeof(BVHTriangle), compare_z);
+    qsort(items, n, sizeof(Item), axis==0?cmp_x:axis==1?cmp_y:cmp_z);
 
-    // Split at median
-    int mid = num_tris / 2;
-
-    node->is_leaf = false;
-    node->num_triangles = 0;
-    node->triangles = NULL;
-    node->materials = NULL;
-    node->left = bvh_build_recursive(tris, mid);
-    node->right = bvh_build_recursive(tris + mid, num_tris - mid);
-
+    const int mid = n / 2;
+    node->count = 0; node->tris = node->mats = NULL;
+    node->left = build(items, mid);
+    node->right = build(items + mid, n - mid);
     return node;
 }
 
-// Build BVH from scene models
-static BVHNode* bvh_build(const xModel *models, const int num_models)
+static BVHNode* bvh_build(const xModel *models, const int num)
 {
-    // Count total triangles
-    int total_triangles = 0;
-    for (int i = 0; i < num_models; i++)
+    int total = 0;
+    for (int i = 0; i < num; i++) total += models[i].num_triangles;
+    if (!total) return NULL;
+
+    Item *items = malloc(total * sizeof(Item));
+    int idx = 0;
+    for (int i = 0; i < num; i++)
     {
-        total_triangles += models[i].num_triangles;
-    }
-
-    if (total_triangles == 0) return NULL;
-
-    // Collect all triangles with their materials and bounds
-    BVHTriangle *tris = malloc(total_triangles * sizeof(BVHTriangle));
-    int tri_idx = 0;
-
-    for (int i = 0; i < num_models; i++)
-    {
-        const xModel *model = &models[i];
-        for (int j = 0; j < model->num_triangles; j++)
+        const xModel *m = &models[i];
+        for (int j = 0; j < m->num_triangles; j++)
         {
-            tris[tri_idx].triangle = model->transformed_triangles[j];
-            tris[tri_idx].material = model->mat;
-            tris[tri_idx].bounds = aabb_from_triangle(model->transformed_triangles[j]);
-            tris[tri_idx].center = aabb_center(tris[tri_idx].bounds);
-            tri_idx++;
+            items[idx].tri = m->transformed_triangles[j];
+            items[idx].mat = m->mat;
+            xTriangle t = m->transformed_triangles[j];
+            items[idx].center = vec3((t.v0.x+t.v1.x+t.v2.x)/3, (t.v0.y+t.v1.y+t.v2.y)/3, (t.v0.z+t.v1.z+t.v2.z)/3);
+            idx++;
         }
     }
 
-    BVHNode *root = bvh_build_recursive(tris, total_triangles);
-    free(tris);
+    BVHNode *root = build(items, total);
+    free(items);
     return root;
 }
 
-// Free BVH tree
-static void bvh_free(BVHNode *node)
+static void bvh_free(BVHNode *n)
 {
-    if (!node) return;
-
-    if (node->is_leaf)
+    if (!n) return;
+    if (n->count)
     {
-        free(node->triangles);
-        free(node->materials);
+        free(n->tris);
+        free(n->mats);
     }
     else
     {
-        bvh_free(node->left);
-        bvh_free(node->right);
+        bvh_free(n->left);
+        bvh_free(n->right);
     }
 
-    free(node);
+    free(n);
+}
+
+bool intersect_triangle(const Ray ray, const xTriangle tri, const xMaterial mat, HitRecord *rec)
+{
+    const Vec3 v0 = tri.v0;
+    const Vec3 v1 = tri.v1;
+    const Vec3 v2 = tri.v2;
+
+    // Compute edges
+    const Vec3 edge1 = sub(v1, v0);
+    const Vec3 edge2 = sub(v2, v0);
+
+    // Begin Möller-Trumbore algorithm
+    const Vec3 h = cross(ray.direction, edge2);
+    const float a = dot(edge1, h);
+
+    // Backface culling: skip back-facing triangles (2x speedup!)
+    if (a < EPSILON) return false;
+
+    const float f = 1.0f / a;
+    const Vec3 s = sub(ray.origin, v0);
+    const float u = f * dot(s, h);
+
+    // Check barycentric coordinate u
+    if (u < 0.0f || u > 1.0f) return false;
+
+    const Vec3 q = cross(s, edge1);
+    const float v = f * dot(ray.direction, q);
+
+    // Check barycentric coordinate v
+    if (v < 0.0f || u + v > 1.0f) return false;
+
+    // Compute intersection distance
+    const float t = f * dot(edge2, q);
+
+    // Check if valid and closer than previous hits
+    if (t < EPSILON || t >= rec->t) return false;
+
+    // Valid hit! Update hit record
+    rec->hit = true;
+    rec->t = t;
+    rec->point = add(ray.origin, mul(ray.direction, t));
+    rec->normal = norm(cross(edge1, edge2));
+    rec->mat = mat;
+
+    return true;
+}
+
+// Iterative traversal (faster than recursion)
+#define STACK_SIZE 64
+static inline bool bvh_intersect(BVHNode *root, Ray ray, HitRecord *rec)
+{
+    if (!root) return false;
+    BVHNode *stack[STACK_SIZE];
+    int sp = 0;
+    stack[sp++] = root;
+    bool hit = false;
+
+    while (sp > 0)
+    {
+        BVHNode *n = stack[--sp];
+        if (!box_hit(n->bounds, ray, 0.001f, rec->t)) continue;
+
+        if (n->count)
+        {
+            for (int i = 0; i < n->count; i++)
+            {
+                if (intersect_triangle(ray, n->tris[i], n->mats[i], rec))
+                    hit = true;
+            }
+        }
+        else
+        {
+            if (sp + 2 < STACK_SIZE)
+            {
+                stack[sp++] = n->left;
+                stack[sp++] = n->right;
+            }
+        }
+    }
+    return hit;
 }
 
 #ifdef __cplusplus
 }
 #endif
-
-#endif // XBVD_H
+#endif

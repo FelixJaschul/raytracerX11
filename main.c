@@ -67,92 +67,14 @@ void scene_init()
 
     // Build BVH after all models are loaded and transformed
     bvh_root = bvh_build(scene_models, num_models);
+    printf("BVH built: %s\n", bvh_root ? "YES" : "NO");
 }
 
-// Ray-triangle intersection
-bool intersect_triangle(const Ray ray, const xTriangle tri, const xMaterial mat, HitRecord *rec)
+bool trace_scene(const Ray ray, HitRecord *rec)
 {
-    const Vec3 v0 = tri.v0;
-    const Vec3 v1 = tri.v1;
-    const Vec3 v2 = tri.v2;
-    const Vec3 edge1 = sub(v1, v0);
-    const Vec3 edge2 = sub(v2, v0);
-    const Vec3 h = cross(ray.direction, edge2);
-    const float a = dot(edge1, h);
-
-    // if (a < EPSILON) return false; // -> Backface Culling
-
-    const float f = 1.0f / a;
-    const Vec3 s = sub(ray.origin, v0);
-    const float u = f * dot(s, h);
-
-    if (u < 0.0f || u > 1.0f) return false;
-
-    const Vec3 q = cross(s, edge1);
-    const float v = f * dot(ray.direction, q);
-
-    if (v < 0.0f || u + v > 1.0f) return false;
-
-    const float t = f * dot(edge2, q);
-
-    if (t < EPSILON || t >= rec->t) return false;
-
-    rec->hit = true;
-    rec->t = t;
-    rec->point = add(ray.origin, mul(ray.direction, t));
-    rec->normal = norm(cross(edge1, edge2));
-    rec->mat = mat;
-    return true;
-}
-
-// Traverse BVH and find closest intersection
-bool trace_bvh(const BVHNode *node, const Ray ray, HitRecord *closest_rec)
-{
-    if (!node) return false;
-
-    // Test ray against node's bounding box
-    if (!aabb_intersect(node->bounds, ray, EPSILON, closest_rec->t)) return false;
-
-    bool hit_anything = false;
-
-    if (node->is_leaf)
-    {
-        for (int i = 0; i < node->num_triangles; i++)
-        {
-            if (intersect_triangle(ray, node->triangles[i], node->materials[i], closest_rec)) hit_anything = true;
-        }
-    }
-    else
-    {
-        // Traverse children
-        hit_anything |= trace_bvh(node->left, ray, closest_rec);
-        hit_anything |= trace_bvh(node->right, ray, closest_rec);
-    }
-
-    return hit_anything;
-}
-
-// Fallback if trace_bvh failes
-bool trace_scene(const Ray ray, HitRecord *closest_rec)
-{
-    closest_rec->hit = false;
-    closest_rec->t = FLT_MAX;
-
-    if (bvh_root)
-    {
-        return trace_bvh(bvh_root, ray, closest_rec);
-    }
-
-    for (int i = 0; i < num_models; i++)
-    {
-        const xModel* model = &scene_models[i];
-        for (int j = 0; j < model->num_triangles; j++)
-        {
-            intersect_triangle(ray, model->transformed_triangles[j], model->mat, closest_rec);
-        }
-    }
-
-    return closest_rec->hit;
+    rec->hit = false;
+    rec->t   = FLT_MAX;
+    return bvh_intersect(bvh_root, ray, rec);
 }
 
 Vec3 calculate_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir, const xMaterial mat)
