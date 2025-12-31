@@ -113,7 +113,7 @@ static inline bool box_hit(const AABB box, const Ray r, float tmin, float tmax)
     tmax = fminf(tmax, fmaxf(t0y, t1y));
     tmax = fminf(tmax, fmaxf(t0z, t1z));
 
-    return tmax > tmin;
+    return tmax >= tmin;
 }
 
 static int cmp_x(const void *a, const void *b)
