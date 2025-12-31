@@ -58,7 +58,9 @@ bool bvh_intersect(BVHNode *root, Ray ray, HitRecord *rec);
 #ifdef UTIL_IMPLEMENTATION
 
 typedef struct {
-    xTriangle tri; xMaterial mat; Vec3 center;
+    xTriangle tri;
+    xMaterial mat;
+    Vec3 center;
 } Item;
 
 // Internal helpers
@@ -82,30 +84,34 @@ static inline AABB box_merge(const AABB a, const AABB b)
     return r;
 }
 
+static inline float box_surface_area(const AABB box)
+{
+    const float dx = box.max.x - box.min.x;
+    const float dy = box.max.y - box.min.y;
+    const float dz = box.max.z - box.min.z;
+    return 2.0f * (dx * dy + dy * dz + dz * dx);
+}
+
 static inline bool box_hit(const AABB box, const Ray r, float tmin, float tmax)
 {
-    float inv, t0, t1;
+    const float inv_x = 1.0f / r.direction.x;
+    const float inv_y = 1.0f / r.direction.y;
+    const float inv_z = 1.0f / r.direction.z;
 
-    inv = 1.0f / r.direction.x;
-    t0 = (box.min.x - r.origin.x) * inv;
-    t1 = (box.max.x - r.origin.x) * inv;
-    if (inv < 0) { const float tmp = t0; t0 = t1; t1 = tmp; }
-    tmin = t0 > tmin ? t0 : tmin;
-    tmax = t1 < tmax ? t1 : tmax;
+    const float t0x = (box.min.x - r.origin.x) * inv_x;
+    const float t1x = (box.max.x - r.origin.x) * inv_x;
+    const float t0y = (box.min.y - r.origin.y) * inv_y;
+    const float t1y = (box.max.y - r.origin.y) * inv_y;
+    const float t0z = (box.min.z - r.origin.z) * inv_z;
+    const float t1z = (box.max.z - r.origin.z) * inv_z;
 
-    inv = 1.0f / r.direction.y;
-    t0 = (box.min.y - r.origin.y) * inv;
-    t1 = (box.max.y - r.origin.y) * inv;
-    if (inv < 0) { const float tmp = t0; t0 = t1; t1 = tmp; }
-    tmin = t0 > tmin ? t0 : tmin;
-    tmax = t1 < tmax ? t1 : tmax;
+    tmin = fmaxf(tmin, fminf(t0x, t1x));
+    tmin = fmaxf(tmin, fminf(t0y, t1y));
+    tmin = fmaxf(tmin, fminf(t0z, t1z));
 
-    inv = 1.0f / r.direction.z;
-    t0 = (box.min.z - r.origin.z) * inv;
-    t1 = (box.max.z - r.origin.z) * inv;
-    if (inv < 0) { const float tmp = t0; t0 = t1; t1 = tmp; }
-    tmin = t0 > tmin ? t0 : tmin;
-    tmax = t1 < tmax ? t1 : tmax;
+    tmax = fminf(tmax, fmaxf(t0x, t1x));
+    tmax = fminf(tmax, fmaxf(t0y, t1y));
+    tmax = fminf(tmax, fmaxf(t0z, t1z));
 
     return tmax > tmin;
 }
@@ -143,16 +149,47 @@ static BVHNode* build(Item *items, const int n)
         return node;
     }
 
-    Vec3 extent = sub(node->bounds.max, node->bounds.min);
+    // Find best axis to split on
+    const Vec3 extent = sub(node->bounds.max, node->bounds.min);
     int axis = (extent.y > extent.x) ? 1 : 0;
     if (extent.z > ((float*)&extent)[axis]) axis = 2;
 
     qsort(items, n, sizeof(Item), axis==0?cmp_x:axis==1?cmp_y:cmp_z);
 
-    const int mid = n / 2;
-    node->count = 0; node->tris = node->mats = NULL;
-    node->left  = build(items, mid);
-    node->right = build(items + mid, n - mid);
+    // SAH: Try different split positions
+    float best_cost = FLT_MAX;
+    int best_split = n / 2;
+    const int num_buckets = (n < 16) ? n : 16;
+
+    for (int i = 1; i < num_buckets && i < n; i++)
+    {
+        const int split = (n * i) / num_buckets;
+        if (split <= 0 || split >= n) continue;
+
+        // Calculate left bounding box
+        AABB left_box = box_tri(items[0].tri);
+        for (int j = 1; j < split; j++) left_box = box_merge(left_box, box_tri(items[j].tri));
+
+        // Calculate right bounding box
+        AABB right_box = box_tri(items[split].tri);
+        for (int j = split + 1; j < n; j++) right_box = box_merge(right_box, box_tri(items[j].tri));
+
+        // SAH cost = surface_area(left) * count(left) + surface_area(right) * count(right)
+        const float left_area = box_surface_area(left_box);
+        const float right_area = box_surface_area(right_box);
+        const float cost = left_area * split + right_area * (n - split);
+
+        if (cost < best_cost)
+        {
+            best_cost = cost;
+            best_split = split;
+        }
+    }
+
+    node->count = 0;
+    node->tris  = node->mats = NULL;
+    node->left  = build(items, best_split);
+    node->right = build(items + best_split, n - best_split);
     return node;
 }
 
@@ -245,7 +282,7 @@ inline bool bvh_intersect(BVHNode *root, Ray ray, HitRecord *rec)
 
     while (sp > 0)
     {
-        BVHNode *n = stack[--sp];
+        const BVHNode *n = stack[--sp];
         if (!box_hit(n->bounds, ray, 0.001f, rec->t)) continue;
 
         if (n->count)

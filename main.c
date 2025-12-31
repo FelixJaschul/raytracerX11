@@ -21,8 +21,10 @@
 #define EPSILON 0.001f
 #define AMBIENT_STRENGTH 0.2f
 #define DIFFUSE_STRENGTH 0.6f
+
 #define MAX_BOUNCES 2
-#define MAX_MODELS 10
+#define MAX_MODELS  10
+#define TILE_SIZE   16
 
 typedef struct {
     bool hit;
@@ -189,14 +191,24 @@ int main()
         if (xIsKeyDown(&input, KEY_E)) xCameraMove(&camera, vec3(0, 1, 0), move_speed);
 
         // Render
-        #pragma omp parallel for schedule(dynamic) default(none) shared(win, camera, u_offsets, v_offsets)
-        for (int y = 0; y < win.height; y++)
+        #pragma omp parallel for schedule(dynamic) collapse(2) default(none) shared(win, camera, u_offsets, v_offsets)
+        for (int ty = 0; ty < win.height; ty += TILE_SIZE)
         {
-            for (int x = 0; x < win.width; x++)
+            for (int tx = 0; tx < win.width; tx += TILE_SIZE)
             {
-                const Ray ray = xCameraGetRay(&camera, u_offsets[x], v_offsets[y]);
-                const Vec3 color = calculate_ray_color(ray, MAX_BOUNCES);
-                win.buffer[y * win.width + x] = uint32(color);
+                // Process tile
+                const int y_end = (ty + TILE_SIZE < win.height) ? ty + TILE_SIZE : win.height;
+                const int x_end = (tx + TILE_SIZE < win.width) ? tx + TILE_SIZE : win.width;
+
+                for (int y = ty; y < y_end; y++)
+                {
+                    for (int x = tx; x < x_end; x++)
+                    {
+                        const Ray ray = xCameraGetRay(&camera, u_offsets[x], v_offsets[y]);
+                        const Vec3 color = calculate_ray_color(ray, MAX_BOUNCES);
+                        win.buffer[y * win.width + x] = uint32(color);
+                    }
+                }
             }
         }
 
