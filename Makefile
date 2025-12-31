@@ -37,6 +37,10 @@ $(TARGET): $(SRC)
 	@echo "Build complete: ./$(TARGET)"
 	@echo "Platform: $(UNAME_S)"
 
+build:
+	chmod +x build.sh
+	./build.sh
+
 clean:
 	rm -f $(TARGET)
 	rm -rf *.dSYM .idea
