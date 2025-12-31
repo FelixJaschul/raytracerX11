@@ -208,7 +208,7 @@ inline BVHNode* bvh_build(const xModel *models, const int num)
         {
             items[idx].tri = m->transformed_triangles[j];
             items[idx].mat = m->mat;
-            xTriangle t = m->transformed_triangles[j];
+            const xTriangle t = m->transformed_triangles[j];
             items[idx].center = vec3((t.v0.x+t.v1.x+t.v2.x)/3.0f, (t.v0.y+t.v1.y+t.v2.y)/3.0f, (t.v0.z+t.v1.z+t.v2.z)/3.0f);
             idx++;
         }
