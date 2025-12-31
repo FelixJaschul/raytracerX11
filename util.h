@@ -79,59 +79,31 @@ static inline AABB box_merge(const AABB a, const AABB b)
     return r;
 }
 
-#ifndef __ARM_NEON__
-static inline bool box_hit(AABB box, Ray ray, float tmin, float tmax)
+static inline bool box_hit(const AABB box, const Ray r, float tmin, float tmax)
 {
-    for (int i = 0; i < 3; i++)
-    {
-        const float inv = 1.0f / ((float*)&ray.direction)[i];
-        float t0 = (((float*)&box.min)[i] - ((float*)&ray.origin)[i]) * inv;
-        float t1 = (((float*)&box.max)[i] - ((float*)&ray.origin)[i]) * inv;
-        if (inv < 0)
-        {
-            const float tmp = t0;
-            t0 = t1;
-            t1 = tmp;
-        }
+    float inv = 1.0f / r.direction.x;
+    float t0 = (box.min.x - r.origin.x) * inv;
+    float t1 = (box.max.x - r.origin.x) * inv;
+    if (inv < 0) { const float tmp = t0; t0 = t1; t1 = tmp; }
+    tmin = t0 > tmin ? t0 : tmin;
+    tmax = t1 < tmax ? t1 : tmax;
 
-        tmin = t0 > tmin ? t0 : tmin;
-        tmax = t1 < tmax ? t1 : tmax;
-        if (tmax <= tmin) return false;
-    }
-    return true;
+    inv = 1.0f / r.direction.y;
+    t0 = (box.min.y - r.origin.y) * inv;
+    t1 = (box.max.y - r.origin.y) * inv;
+    if (inv < 0) { const float tmp = t0; t0 = t1; t1 = tmp; }
+    tmin = t0 > tmin ? t0 : tmin;
+    tmax = t1 < tmax ? t1 : tmax;
+
+    inv = 1.0f / r.direction.z;
+    t0 = (box.min.z - r.origin.z) * inv;
+    t1 = (box.max.z - r.origin.z) * inv;
+    if (inv < 0) { const float tmp = t0; t0 = t1; t1 = tmp; }
+    tmin = t0 > tmin ? t0 : tmin;
+    tmax = t1 < tmax ? t1 : tmax;
+
+    return tmax > tmin;
 }
-#endif
-
-#ifdef __ARM_NEON__
-#include <arm_neon.h>
-
-static inline bool box_hit(const AABB box, const Ray ray, const float tmin, const float tmax)
-{
-    float ray_o[4]   = {ray.origin.x, ray.origin.y, ray.origin.z, 0};
-    float ray_d[4]   = {ray.direction.x, ray.direction.y, ray.direction.z, 1};
-    float box_min[4] = {box.min.x, box.min.y, box.min.z, 0};
-    float box_max[4] = {box.max.x, box.max.y, box.max.z, 0};
-
-    const float32x4_t ray_orig = vld1q_f32(ray_o);
-    const float32x4_t ray_dir = vld1q_f32(ray_d);
-    const float32x4_t bmin = vld1q_f32(box_min);
-    const float32x4_t bmax = vld1q_f32(box_max);
-
-    float32x4_t inv_dir = vrecpeq_f32(ray_dir);
-    inv_dir = vmulq_f32(vrecpsq_f32(ray_dir, inv_dir), inv_dir);
-
-    const float32x4_t t0 = vmulq_f32(vsubq_f32(bmin, ray_orig), inv_dir);
-    const float32x4_t t1 = vmulq_f32(vsubq_f32(bmax, ray_orig), inv_dir);
-
-    const float32x4_t t_near = vminq_f32(t0, t1);
-    const float32x4_t t_far = vmaxq_f32(t0, t1);
-
-    const float t_entry = fmaxf(fmaxf(vgetq_lane_f32(t_near,0), vgetq_lane_f32(t_near,1)), fmaxf(vgetq_lane_f32(t_near,2), tmin));
-    const float t_exit  = fminf(fminf(vgetq_lane_f32(t_far ,0), vgetq_lane_f32(t_far ,1)), fminf(vgetq_lane_f32(t_far ,2), tmax));
-
-    return t_exit > t_entry;
-}
-#endif
 
 static int cmp_x(const void *a, const void *b)
 {
@@ -148,15 +120,15 @@ static int cmp_z(const void *a, const void *b)
 
 static BVHNode* build(Item *items, const int n)
 {
-    BVHNode *node = (BVHNode*)malloc(sizeof(BVHNode));
+    BVHNode *node = malloc(sizeof(BVHNode));
     node->bounds = box_tri(items[0].tri);
     for (int i = 1; i < n; i++) node->bounds = box_merge(node->bounds, box_tri(items[i].tri));
 
     if (n <= 4)
     {
         node->count = n;
-        node->tris = (xTriangle*)malloc(n * sizeof(xTriangle));
-        node->mats = (xMaterial*)malloc(n * sizeof(xMaterial));
+        node->tris = malloc(n * sizeof(xTriangle));
+        node->mats = malloc(n * sizeof(xMaterial));
         for (int i = 0; i < n; i++)
         {
             node->tris[i] = items[i].tri;
@@ -185,7 +157,7 @@ inline BVHNode* bvh_build(const xModel *models, const int num)
     for (int i = 0; i < num; i++) total += models[i].num_triangles;
     if (!total) return NULL;
 
-    Item *items = (Item*)malloc(total * sizeof(Item));
+    Item *items = malloc(total * sizeof(Item));
     int idx = 0;
     for (int i = 0; i < num; i++)
     {
