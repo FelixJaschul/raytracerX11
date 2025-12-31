@@ -86,13 +86,7 @@ static inline bool box_hit(AABB box, Ray ray, float tmin, float tmax)
         const float inv = 1.0f / ((float*)&ray.direction)[i];
         float t0 = (((float*)&box.min)[i] - ((float*)&ray.origin)[i]) * inv;
         float t1 = (((float*)&box.max)[i] - ((float*)&ray.origin)[i]) * inv;
-        if (inv < 0)
-        {
-            const float tmp = t0;
-                         t0 = t1;
-                         t1 = tmp;
-        }
-
+        if (inv < 0) { const float tmp = t0; t0 = t1; t1 = tmp; }
         tmin = t0 > tmin ? t0 : tmin;
         tmax = t1 < tmax ? t1 : tmax;
         if (tmax <= tmin) return false;
@@ -124,7 +118,11 @@ static BVHNode* build(Item *items, const int n)
         node->count = n;
         node->tris = (xTriangle*)malloc(n * sizeof(xTriangle));
         node->mats = (xMaterial*)malloc(n * sizeof(xMaterial));
-        for (int i = 0; i < n; i++) { node->tris[i] = items[i].tri; node->mats[i] = items[i].mat; }
+        for (int i = 0; i < n; i++)
+        {
+            node->tris[i] = items[i].tri;
+            node->mats[i] = items[i].mat;
+        }
         node->left = node->right = NULL;
         return node;
     }
@@ -137,7 +135,7 @@ static BVHNode* build(Item *items, const int n)
 
     const int mid = n / 2;
     node->count = 0; node->tris = node->mats = NULL;
-    node->left = build(items, mid);
+    node->left  = build(items, mid);
     node->right = build(items + mid, n - mid);
     return node;
 }
