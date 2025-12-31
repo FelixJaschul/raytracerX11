@@ -81,9 +81,11 @@ static inline AABB box_merge(const AABB a, const AABB b)
 
 static inline bool box_hit(const AABB box, const Ray r, float tmin, float tmax)
 {
-    float inv = 1.0f / r.direction.x;
-    float t0 = (box.min.x - r.origin.x) * inv;
-    float t1 = (box.max.x - r.origin.x) * inv;
+    float inv, t0, t1;
+
+    inv = 1.0f / r.direction.x;
+    t0 = (box.min.x - r.origin.x) * inv;
+    t1 = (box.max.x - r.origin.x) * inv;
     if (inv < 0) { const float tmp = t0; t0 = t1; t1 = tmp; }
     tmin = t0 > tmin ? t0 : tmin;
     tmax = t1 < tmax ? t1 : tmax;
