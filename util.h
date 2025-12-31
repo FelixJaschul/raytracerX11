@@ -101,7 +101,6 @@ static inline bool box_hit(AABB box, Ray ray, float tmin, float tmax)
     return true;
 }
 #endif
-
 #ifdef __ARM_NEON__
 #include <arm_neon.h>
 
