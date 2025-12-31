@@ -158,8 +158,8 @@ int main()
     const float viewport_height = 2.0f;
     const float viewport_width = (float)win.width / (float)win.height * viewport_height;
 
-    float* u_offsets = (float*)malloc(win.width * sizeof(float));
-    float* v_offsets = (float*)malloc(win.height * sizeof(float));
+    float* u_offsets = malloc(win.width * sizeof(float));
+    float* v_offsets = malloc(win.height * sizeof(float));
     assert(u_offsets && v_offsets && "Failed to allocate viewport offset buffers");
 
     for (int x = 0; x < win.width; x++)  u_offsets[x] = ((float)x / (float)(win.width - 1) - 0.5f) * viewport_width;
