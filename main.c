@@ -22,7 +22,7 @@
 #define EPSILON 0.001f
 #define AMBIENT_STRENGTH 0.2f
 #define DIFFUSE_STRENGTH 0.6f
-#define MAX_BOUNCES 2
+#define MAX_BOUNCES 10
 #define MAX_MODELS 10
 
 typedef struct {
@@ -46,17 +46,17 @@ void scene_init()
     #define TOGGLE_REFLECTIVITY 1
     #define WALL_REFLECTIVITY (0.3f * TOGGLE_REFLECTIVITY)
 
-    xModel *floor = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(0.0f, 0.0f, 1.0f), WALL_REFLECTIVITY);
-    xModelLoad(floor, "res/rect.obj");
-    xModelTransform(floor, vec3(-2.0f, 0.0f, 2.0f), vec3(-M_PI/2, 0, 0), vec3(4.0f, 4.0f, 1.0f));
+    xModel *f = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(0.0f, 0.0f, 1.0f), WALL_REFLECTIVITY);
+    xModelLoad(f, "res/rect.obj");
+    xModelTransform(f, vec3(-2.0f, 0.0f, 2.0f), vec3(-M_PI/2, 0, 0), vec3(4.0f, 4.0f, 1.0f));
 
-    xModel *left_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 0.0f, 0.0f), WALL_REFLECTIVITY);
-    xModelLoad(left_wall, "res/rect.obj");
-    xModelTransform(left_wall, vec3(-2.0f, 0.0f, 2.0f), vec3(0, -M_PI/2, 0), vec3(4.0f, 4.0f, 1.0f));
+    xModel *lw = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 0.0f, 0.0f), WALL_REFLECTIVITY);
+    xModelLoad(lw, "res/rect.obj");
+    xModelTransform(lw, vec3(-2.0f, 0.0f, 2.0f), vec3(0, -M_PI/2, 0), vec3(4.0f, 4.0f, 1.0f));
 
-    xModel *front_wall = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(0.0f, 1.0f, 0.0f), WALL_REFLECTIVITY);
-    xModelLoad(front_wall, "res/rect.obj");
-    xModelTransform(front_wall, vec3(-2.0f, 0.0f, -2.0f), vec3(0, 0, 0), vec3(4.0f, 4.0f, 1.0f));
+    xModel *bw = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(0.0f, 1.0f, 0.0f), WALL_REFLECTIVITY);
+    xModelLoad(bw, "res/rect.obj");
+    xModelTransform(bw, vec3(-2.0f, 0.0f, -2.0f), vec3(0, 0, 0), vec3(4.0f, 4.0f, 1.0f));
 
     xModel *bunni = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), 0.3f * TOGGLE_REFLECTIVITY);
     xModelLoad(bunni, "res/bunni.obj");
