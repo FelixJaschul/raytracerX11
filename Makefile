@@ -14,7 +14,7 @@ UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
     # macOS with Homebrew LLVM (for OpenMP support)
     CC = /opt/homebrew/opt/llvm/bin/clang
-    CFLAGS += -I/opt/X11/include -I/opt/homebrew/include
+    CFLAGS += -I/opt/X11/include -I/opt/homebrew/include -march=armv8-a+simd -mtune=native -ffast-math
     LDFLAGS += -L/opt/X11/lib -L/opt/homebrew/lib
     LIBS += -lomp
 else ifeq ($(UNAME_S),Linux)
@@ -36,10 +36,6 @@ $(TARGET): $(SRC)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(SRC) $(LIBS) -o $(TARGET)
 	@echo "Build complete: ./$(TARGET)"
 	@echo "Platform: $(UNAME_S)"
-
-build:
-	chmod +x build.sh
-	./build.sh
 
 clean:
 	rm -f $(TARGET)
