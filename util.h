@@ -11,6 +11,9 @@
 #define EPSILON 0.0001f
 #endif
 
+#define STACK_SIZE 1028
+#define LEAF_SIZE 4
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -126,7 +129,7 @@ static BVHNode* build(Item *items, const int n)
     node->bounds = box_tri(items[0].tri);
     for (int i = 1; i < n; i++) node->bounds = box_merge(node->bounds, box_tri(items[i].tri));
 
-    if (n <= 4)
+    if (n <= LEAF_SIZE)
     {
         node->count = n;
         node->tris = malloc(n * sizeof(xTriangle));
@@ -232,7 +235,6 @@ static inline bool intersect_triangle(const Ray ray, const xTriangle tri, const 
     return true;
 }
 
-#define STACK_SIZE 64
 inline bool bvh_intersect(BVHNode *root, Ray ray, HitRecord *rec)
 {
     if (!root) return false;

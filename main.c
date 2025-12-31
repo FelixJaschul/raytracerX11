@@ -104,13 +104,18 @@ Vec3 calculate_ray_color(const Ray ray, const int depth)
         const Vec3 view_dir = mul(ray.direction, -1.0f);
         Vec3 color = calculate_lighting(rec.point, rec.normal, view_dir, rec.mat);
 
-        if (depth > 1 && rec.mat.reflectivity > 0.0f)
+        // Add Fresnel-like effect (edges more reflective)
+        const float facing = dot(view_dir, rec.normal);
+        const float adjusted_reflectivity = rec.mat.reflectivity * (1.0f - facing * 0.5f);
+
+        if (depth > 1 && adjusted_reflectivity > 0.05f)
         {
             const Vec3 reflect_dir = reflect(ray.direction, rec.normal);
             const Ray reflect_ray = {rec.point, reflect_dir};
             const Vec3 reflect_color = calculate_ray_color(reflect_ray, depth - 1);
-            color = add(mul(color, 1.0f - rec.mat.reflectivity), mul(reflect_color, rec.mat.reflectivity));
+            color = add(mul(color, 1.0f - adjusted_reflectivity), mul(reflect_color, adjusted_reflectivity));
         }
+
 
         return color;
     }
@@ -143,7 +148,7 @@ int main()
     // Initialize camera
     xCamera camera;
     xCameraInit(&camera);
-    camera.position = vec3(0.0f, 2.0f, 5.0f);
+    camera.position = vec3(0.0f, 0.7f, 2.0f);
     camera.yaw = -90.0f;
 
     // Load scene
