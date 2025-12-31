@@ -4,7 +4,6 @@
 #include <math.h>
 #include <float.h>
 #include <stdint.h>
-#include <omp.h>
 
 #define XKEYS_IMPLEMENTATION
 #define XMATH_IMPLEMENTATION
@@ -12,7 +11,7 @@
 #define XMODEL_IMPLEMENTATION
 #include <wrapperX11/x11.h>
 
-#define XTITLE "Raytracer X11"
+#define XTITLE "X11"
 #define XFPS 120
 #define SENS_X 0.40f
 #define SENS_Y 0.15f
