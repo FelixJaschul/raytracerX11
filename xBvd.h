@@ -156,34 +156,28 @@ static void bvh_free(BVHNode *n)
     free(n);
 }
 
-bool intersect_triangle(const Ray ray, const xTriangle tri, const xMaterial mat, HitRecord *rec)
+inline bool intersect_triangle(const Ray ray, const xTriangle tri, const xMaterial mat, HitRecord *rec)
 {
     const Vec3 v0 = tri.v0;
     const Vec3 v1 = tri.v1;
     const Vec3 v2 = tri.v2;
 
-    // Compute edges
     const Vec3 edge1 = sub(v1, v0);
     const Vec3 edge2 = sub(v2, v0);
 
-    // Begin Möller-Trumbore algorithm
     const Vec3 h = cross(ray.direction, edge2);
     const float a = dot(edge1, h);
 
-    // Backface culling: skip back-facing triangles (2x speedup!)
-    if (a < EPSILON) return false;
+    // if (a < EPSILON) return false;
 
     const float f = 1.0f / a;
     const Vec3 s = sub(ray.origin, v0);
     const float u = f * dot(s, h);
 
-    // Check barycentric coordinate u
-    if (u < 0.0f || u > 1.0f) return false;
-
     const Vec3 q = cross(s, edge1);
     const float v = f * dot(ray.direction, q);
 
-    // Check barycentric coordinate v
+    if (u < 0.0f || u > 1.0f)     return false;
     if (v < 0.0f || u + v > 1.0f) return false;
 
     // Compute intersection distance
