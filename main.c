@@ -35,7 +35,8 @@ typedef struct {
     xMaterial mat;
 } HitRecord;
 
-#include "xBvd.h"
+#define UTIL_IMPLEMENTATION
+#include "util.h"
 
 xModel scene_models[MAX_MODELS];
 int num_models = 0;

@@ -1,21 +1,26 @@
 // ============================================================================
-// xBvd.h -> BVH implementation
+// xBvd.h - Bounding Volume Hierarchy for fast ray-triangle intersection
 // ============================================================================
-
-#ifndef XBVH_H
-#define XBVH_H
+#ifndef UTIL_H
+#define UTIL_H
 
 #include <stdlib.h>
-#include <stdbool.h>
+#include <math.h>
+
+#ifndef EPSILON
+#define EPSILON 0.0001f
+#endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+// Axis-Aligned Bounding Box
 typedef struct {
     Vec3 min, max;
 } AABB;
 
+// BVH Tree Node
 typedef struct BVHNode {
     AABB bounds;
     struct BVHNode *left, *right;
@@ -24,7 +29,36 @@ typedef struct BVHNode {
     int count;
 } BVHNode;
 
-// Inline helpers
+// Build BVH from array of models
+/*  -> Example:
+ *  BVHNode* root = bvh_build(models, num_models);
+ */
+BVHNode* bvh_build(const xModel *models, int num);
+
+// Free all resources used by BVH
+/*  -> Example:
+ *  bvh_free(root);
+ */
+void bvh_free(BVHNode *n);
+
+// Intersect ray with BVH, returns true if hit found
+/*  -> Example:
+ *  HitRecord rec = { .hit = false, .t = 1e30f };
+ *  if (bvh_intersect(root, ray, &rec)) { ... }
+ */
+bool bvh_intersect(BVHNode *root, Ray ray, HitRecord *rec);
+
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef UTIL_IMPLEMENTATION
+
+typedef struct {
+    xTriangle tri; xMaterial mat; Vec3 center;
+} Item;
+
+// Internal helpers
 static inline AABB box_tri(const xTriangle t)
 {
     AABB b;
@@ -66,11 +100,6 @@ static inline bool box_hit(AABB box, Ray ray, float tmin, float tmax)
     return true;
 }
 
-typedef struct {
-    xTriangle tri; xMaterial mat; Vec3 center;
-} Item;
-
-// Straight up ChatGPTed this lol
 static int cmp_x(const void *a, const void *b)
 {
     return (((Item*)a)->center.x > ((Item*)b)->center.x) - (((Item*)a)->center.x < ((Item*)b)->center.x);
@@ -86,15 +115,15 @@ static int cmp_z(const void *a, const void *b)
 
 static BVHNode* build(Item *items, const int n)
 {
-    BVHNode *node = malloc(sizeof(BVHNode));
+    BVHNode *node = (BVHNode*)malloc(sizeof(BVHNode));
     node->bounds = box_tri(items[0].tri);
     for (int i = 1; i < n; i++) node->bounds = box_merge(node->bounds, box_tri(items[i].tri));
 
     if (n <= 4)
     {
         node->count = n;
-        node->tris = malloc(n * sizeof(xTriangle));
-        node->mats = malloc(n * sizeof(xMaterial));
+        node->tris = (xTriangle*)malloc(n * sizeof(xTriangle));
+        node->mats = (xMaterial*)malloc(n * sizeof(xMaterial));
         for (int i = 0; i < n; i++) { node->tris[i] = items[i].tri; node->mats[i] = items[i].mat; }
         node->left = node->right = NULL;
         return node;
@@ -113,13 +142,13 @@ static BVHNode* build(Item *items, const int n)
     return node;
 }
 
-static BVHNode* bvh_build(const xModel *models, const int num)
+inline BVHNode* bvh_build(const xModel *models, const int num)
 {
     int total = 0;
     for (int i = 0; i < num; i++) total += models[i].num_triangles;
     if (!total) return NULL;
 
-    Item *items = malloc(total * sizeof(Item));
+    Item *items = (Item*)malloc(total * sizeof(Item));
     int idx = 0;
     for (int i = 0; i < num; i++)
     {
@@ -129,7 +158,7 @@ static BVHNode* bvh_build(const xModel *models, const int num)
             items[idx].tri = m->transformed_triangles[j];
             items[idx].mat = m->mat;
             xTriangle t = m->transformed_triangles[j];
-            items[idx].center = vec3((t.v0.x+t.v1.x+t.v2.x)/3, (t.v0.y+t.v1.y+t.v2.y)/3, (t.v0.z+t.v1.z+t.v2.z)/3);
+            items[idx].center = vec3((t.v0.x+t.v1.x+t.v2.x)/3.0f, (t.v0.y+t.v1.y+t.v2.y)/3.0f, (t.v0.z+t.v1.z+t.v2.z)/3.0f);
             idx++;
         }
     }
@@ -139,7 +168,7 @@ static BVHNode* bvh_build(const xModel *models, const int num)
     return root;
 }
 
-static void bvh_free(BVHNode *n)
+inline void bvh_free(BVHNode *n)
 {
     if (!n) return;
     if (n->count)
@@ -152,11 +181,10 @@ static void bvh_free(BVHNode *n)
         bvh_free(n->left);
         bvh_free(n->right);
     }
-
     free(n);
 }
 
-inline bool intersect_triangle(const Ray ray, const xTriangle tri, const xMaterial mat, HitRecord *rec)
+static inline bool intersect_triangle(const Ray ray, const xTriangle tri, const xMaterial mat, HitRecord *rec)
 {
     const Vec3 v0 = tri.v0;
     const Vec3 v1 = tri.v1;
@@ -168,7 +196,7 @@ inline bool intersect_triangle(const Ray ray, const xTriangle tri, const xMateri
     const Vec3 h = cross(ray.direction, edge2);
     const float a = dot(edge1, h);
 
-    // if (a < EPSILON) return false;
+    if (fabsf(a) < EPSILON) return false;
 
     const float f = 1.0f / a;
     const Vec3 s = sub(ray.origin, v0);
@@ -180,13 +208,10 @@ inline bool intersect_triangle(const Ray ray, const xTriangle tri, const xMateri
     if (u < 0.0f || u > 1.0f)     return false;
     if (v < 0.0f || u + v > 1.0f) return false;
 
-    // Compute intersection distance
     const float t = f * dot(edge2, q);
 
-    // Check if valid and closer than previous hits
     if (t < EPSILON || t >= rec->t) return false;
 
-    // Valid hit! Update hit record
     rec->hit = true;
     rec->t = t;
     rec->point = add(ray.origin, mul(ray.direction, t));
@@ -196,9 +221,8 @@ inline bool intersect_triangle(const Ray ray, const xTriangle tri, const xMateri
     return true;
 }
 
-// Iterative traversal (faster than recursion)
 #define STACK_SIZE 64
-static inline bool bvh_intersect(BVHNode *root, Ray ray, HitRecord *rec)
+inline bool bvh_intersect(BVHNode *root, Ray ray, HitRecord *rec)
 {
     if (!root) return false;
     BVHNode *stack[STACK_SIZE];
@@ -214,10 +238,7 @@ static inline bool bvh_intersect(BVHNode *root, Ray ray, HitRecord *rec)
         if (n->count)
         {
             for (int i = 0; i < n->count; i++)
-            {
-                if (intersect_triangle(ray, n->tris[i], n->mats[i], rec))
-                    hit = true;
-            }
+                if (intersect_triangle(ray, n->tris[i], n->mats[i], rec)) hit = true;
         }
         else
         {
@@ -231,7 +252,5 @@ static inline bool bvh_intersect(BVHNode *root, Ray ray, HitRecord *rec)
     return hit;
 }
 
-#ifdef __cplusplus
-}
-#endif
-#endif
+#endif // UTIL_IMPLEMENTATION
+#endif // UTIL_H
