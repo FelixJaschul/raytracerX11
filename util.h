@@ -39,9 +39,6 @@ typedef struct BVHNode {
 BVHNode* bvh_build(const xModel *models, int num);
 
 // Free all resources used by BVH
-/*  -> Example:
- *  bvh_free(root);
- */
 void bvh_free(BVHNode *n);
 
 // Intersect ray with BVH, returns true if hit found
