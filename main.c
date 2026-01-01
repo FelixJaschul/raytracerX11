@@ -145,8 +145,8 @@ int main()
 
     if (!xCreateWindow(&win)) return 1;
 
-    // Initialize input state
-    xInputState input;
+    // Initialize input
+    xInput input;
     xInputInit(&input);
 
     // Initialize camera
