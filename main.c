@@ -98,12 +98,17 @@ bool trace_scene(const RAY ray, HitRecord *rec, int model_idx)
 
 bool is_shadow(const Vec3 point, const Vec3 light_dir, const float light_distance)
 {
+#define SHADOW
+#ifdef  SHADOW
     const RAY shadow_ray = make_ray(point, light_dir);
     HitRecord rec;
     rec.hit = false;
     rec.t = light_distance - EPSILON; // Only check up to light
 
     return bvh_intersect(bvh_root, shadow_ray, &rec);
+#else
+    return false;
+#endif
 }
 
 Vec3 calculate_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir, const xMaterial mat)
@@ -114,8 +119,8 @@ Vec3 calculate_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir
     const float light_dist_sq = dot(light_vec, light_vec);
     const float light_dist = sqrtf(light_dist_sq);
     const Vec3 light_dir = mul(light_vec, 1.0f / light_dist);
-
     const Vec3 ambient = mul(mat.color, AMBIENT_STRENGTH);
+
     if (is_shadow(point, light_dir, light_dist)) return ambient;
 
     const float attenuation = light_intensity / (light_dist_sq + 1.0f);
