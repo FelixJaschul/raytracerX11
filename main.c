@@ -20,12 +20,19 @@
 
 #define EPSILON          0.001f
 #define RAY_OFFSET       0.0002f
-#define AMBIENT_STRENGTH 0.2f
-#define DIFFUSE_STRENGTH 0.6f
+#define AMBIENT_STRENGTH 0.05f
+#define DIFFUSE_STRENGTH 0.8f
 
 #define MAX_BOUNCES 2
 #define MAX_MODELS  10
 #define TILE_SIZE   16
+
+typedef struct {
+    Vec3 origin;
+    Vec3 direction;
+    // Precomputed inverse for AABB tests
+    Vec3 inv_direction;
+} RAY;
 
 typedef struct {
     bool hit;
@@ -73,37 +80,60 @@ void scene_init()
 #undef TOGGLE_REFLECTIVITY
 #undef WALL_REFLECTIVITY
 
-bool trace_scene(const Ray ray, HitRecord *rec)
+static inline RAY make_ray(const Vec3 origin, const Vec3 direction)
+{
+    RAY r;
+    r.origin = origin;
+    r.direction = direction;
+    r.inv_direction = vec3(1.0f / direction.x, 1.0f / direction.y, 1.0f / direction.z);
+    return r;
+}
+
+bool trace_scene(const RAY ray, HitRecord *rec, int model_idx)
 {
     rec->hit = false;
     rec->t   = FLT_MAX;
     return bvh_intersect(bvh_root, ray, rec);
 }
 
+bool is_shadow(const Vec3 point, const Vec3 light_dir, const float light_distance)
+{
+    const RAY shadow_ray = make_ray(point, light_dir);
+    HitRecord rec;
+    rec.hit = false;
+    rec.t = light_distance - EPSILON; // Only check up to light
+
+    return bvh_intersect(bvh_root, shadow_ray, &rec);
+}
+
 Vec3 calculate_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir, const xMaterial mat)
 {
-    const Vec3 light_pos = vec3(0.0f, 3.8f, 0.0f);
+    const Vec3 light_pos = vec3(1.0f, 2.5f, 1.0f);
+    const float light_intensity = 5.0f;
     const Vec3 light_vec = sub(light_pos, point);
-    const float light_len_sq = dot(light_vec, light_vec);
-    const float light_len = sqrtf(light_len_sq);
-    const Vec3 light_dir = mul(light_vec, 1.0f / light_len);
+    const float light_dist_sq = dot(light_vec, light_vec);
+    const float light_dist = sqrtf(light_dist_sq);
+    const Vec3 light_dir = mul(light_vec, 1.0f / light_dist);
 
     const Vec3 ambient = mul(mat.color, AMBIENT_STRENGTH);
-    const float diff = fmaxf(dot(normal, light_dir), 0.0f);
-    const Vec3 diffuse = mul(mat.color, diff * DIFFUSE_STRENGTH);
+    if (is_shadow(point, light_dir, light_dist)) return ambient;
+
+    const float attenuation = light_intensity / (light_dist_sq + 1.0f);
+    const float n_dot_l = fmaxf(dot(normal, light_dir), 0.0f);
+    const Vec3 diffuse = mul(mat.color, n_dot_l * DIFFUSE_STRENGTH * attenuation);
 
     const Vec3 reflect_dir = reflect(mul(light_dir, -1.0f), normal);
     float spec = fmaxf(dot(view_dir, reflect_dir), 0.0f);
-    spec *= spec; spec *= spec; spec *= spec; spec *= spec; spec *= spec;
-    const Vec3 specular = vec3(spec * mat.specular, spec * mat.specular, spec * mat.specular);
+    spec = powf(spec, 32.0f);
+    const Vec3 specular = mul(vec3(1,1,1), spec * mat.specular * attenuation);
 
     return add(add(ambient, diffuse), specular);
 }
 
-Vec3 calculate_ray_color(const Ray ray, const int depth)
+Vec3 calculate_ray_color(const RAY ray, const int depth)
 {
     HitRecord rec;
-    if (trace_scene(ray, &rec))
+    if (trace_scene(ray, &rec, -1))
     {
         const Vec3 view_dir = mul(ray.direction, -1.0f);
         Vec3 color = calculate_lighting(rec.point, rec.normal, view_dir, rec.mat);
@@ -115,27 +145,55 @@ Vec3 calculate_ray_color(const Ray ray, const int depth)
         if (depth > 1 && adjusted_reflectivity > 0.05f)
         {
             const Vec3 reflect_dir = reflect(ray.direction, rec.normal);
-            const Ray reflect_ray = {rec.point, reflect_dir};
+            const RAY reflect_ray = make_ray(rec.point, reflect_dir);
             const Vec3 reflect_color = calculate_ray_color(reflect_ray, depth - 1);
             color = add(mul(color, 1.0f - adjusted_reflectivity), mul(reflect_color, adjusted_reflectivity));
         }
         return color;
     }
-    return vec3(0.0f, 0.0f, 0.0f);
+    return vec3(0.0f, 0.0f, 0.0f); // Black background
 }
 
-static inline uint32_t uint32(const Vec3 color)
+void tonemap(Vec3 *color)
 {
-    const float r = CLAMP(color.x, 0.0f, 1.0f);
-    const float g = CLAMP(color.y, 0.0f, 1.0f);
-    const float b = CLAMP(color.z, 0.0f, 1.0f);
-    return ((int)(r * 255) << 16) | ((int)(g * 255) << 8) | (int)(b * 255);
+#define TONEMAP_ACES
+#ifdef  TONEMAP_ACES
+    const float a = 2.51f;
+    const float b = 0.03f;
+    const float c = 2.43f;
+    const float d = 0.59f;
+    const float e = 0.14f;
+
+    color->x = (color->x * (a * color->x + b)) / (color->x * (c * color->x + d) + e);
+    color->y = (color->y * (a * color->y + b)) / (color->y * (c * color->y + d) + e);
+    color->z = (color->z * (a * color->z + b)) / (color->z * (c * color->z + d) + e);
+#else // Reinhard tonemap
+    color->x = color->x / (1.0f + color->x);
+    color->y = color->y / (1.0f + color->y);
+    color->z = color->z / (1.0f + color->z);
+#endif
+#undef TONEMAP_ACES
 }
 
-static inline Vec3 rotate_y_local(const Vec3 v, const float a)
+uint32_t uint32(Vec3 color)
 {
-    const float c = cosf(a), s = sinf(a);
-    return vec3(v.x * c - v.z * s, v.y, v.x * s + v.z * c);
+    // 1. Tonemap from HDR to SDR (0-1 range)
+    tonemap(&color);
+
+    // 2. Clamp to SDR range
+    color.x = CLAMP(color.x, 0.0f, 1.0f);
+    color.y = CLAMP(color.y, 0.0f, 1.0f);
+    color.z = CLAMP(color.z, 0.0f, 1.0f);
+
+    // 3. Apply gamma correction
+    color = vec3(
+        powf(color.x, 1.0f / 2.2f),
+        powf(color.y, 1.0f / 2.2f),
+        powf(color.z, 1.0f / 2.2f)
+    );;
+
+    // 4. Convert to 8-bit integer
+    return ((int)(color.x * 255) << 16) | ((int)(color.y * 255) << 8) | (int)(color.z * 255);
 }
 
 int main()
@@ -176,13 +234,13 @@ int main()
     // Main loop
     while (1)
     {
-        if (alpha == 630) { alpha = 0; } alpha++; // turn one time and reset
         printf("FPS: %.2f\n", xGetFPS(&win));
-        const float move_speed = 0.03f;
-
         // Update xModel transform values
+        if (alpha == 630) { alpha = 0; } alpha++; // turn one time and reset
         xModelTransform(&scene_models[3], vec3(0.0f, -0.33f, 0.0f), vec3(0, alpha * 0.01f, 0), vec3(10.0f, 10.0f, 10.0f));
-        xModelUpdate(scene_models, num_models); bvh_free(bvh_root); // Free previous BVH
+
+        xModelUpdate(scene_models, num_models);
+        bvh_free(bvh_root); // Free previous BVH
         bvh_build(&bvh_root, scene_models, num_models);
 
         // Poll events with explicit input state
@@ -196,6 +254,7 @@ int main()
         xCameraRotate(&camera, dx * SENS_X, -dy * SENS_Y);
 
         // Keyboard movement
+        const float move_speed = 0.03f;
         if (xIsKeyDown(&input, KEY_W)) xCameraMove(&camera, camera.front, move_speed);
         if (xIsKeyDown(&input, KEY_S)) xCameraMove(&camera, mul(camera.front, -1), move_speed);
         if (xIsKeyDown(&input, KEY_A)) xCameraMove(&camera, mul(camera.right, -1), move_speed);
@@ -218,7 +277,8 @@ int main()
                     uint32_t* restrict row = &win.buffer[y * win.width];
                     for (int x = tx; x < x_end; x++)
                     {
-                        const Ray ray = xCameraGetRay(&camera, u_offsets[x], v_offsets[y]);
+                        Ray cam_ray = xCameraGetRay(&camera, u_offsets[x], v_offsets[y]);
+                        RAY ray = make_ray(cam_ray.origin, cam_ray.direction);
                         row[x] = uint32(calculate_ray_color(ray, MAX_BOUNCES));
                     }
                 }

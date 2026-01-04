@@ -46,7 +46,7 @@ void bvh_free(BVHNode *n);
  *  HitRecord rec = { .hit = false, .t = 1e30f };
  *  if (bvh_intersect(root, ray, &rec)) { ... }
  */
-bool bvh_intersect(BVHNode *root, Ray ray, HitRecord *rec);
+bool bvh_intersect(BVHNode *root, RAY ray, HitRecord *rec);
 
 #ifdef __cplusplus
 }
@@ -89,18 +89,16 @@ static inline float box_surface_area(const AABB box)
     return 2.0f * (dx * dy + dy * dz + dz * dx);
 }
 
-static inline bool box_hit(const AABB box, const Ray r, float tmin, float tmax)
+// Optimized AABB intersection using precomputed inverse direction
+static inline bool box_hit(const AABB box, const RAY r, float tmin, float tmax)
 {
-    const float inv_x = 1.0f / r.direction.x;
-    const float inv_y = 1.0f / r.direction.y;
-    const float inv_z = 1.0f / r.direction.z;
-
-    const float t0x = (box.min.x - r.origin.x) * inv_x;
-    const float t1x = (box.max.x - r.origin.x) * inv_x;
-    const float t0y = (box.min.y - r.origin.y) * inv_y;
-    const float t1y = (box.max.y - r.origin.y) * inv_y;
-    const float t0z = (box.min.z - r.origin.z) * inv_z;
-    const float t1z = (box.max.z - r.origin.z) * inv_z;
+    // Use precomputed inverse direction instead of computing 1.0f / r.direction
+    const float t0x = (box.min.x - r.origin.x) * r.inv_direction.x;
+    const float t1x = (box.max.x - r.origin.x) * r.inv_direction.x;
+    const float t0y = (box.min.y - r.origin.y) * r.inv_direction.y;
+    const float t1y = (box.max.y - r.origin.y) * r.inv_direction.y;
+    const float t0z = (box.min.z - r.origin.z) * r.inv_direction.z;
+    const float t1z = (box.max.z - r.origin.z) * r.inv_direction.z;
 
     tmin = fmaxf(tmin, fminf(t0x, t1x));
     tmin = fmaxf(tmin, fminf(t0y, t1y));
@@ -231,7 +229,7 @@ inline void bvh_free(BVHNode *n)
     free(n);
 }
 
-static inline bool intersect_triangle(const Ray ray, const xTriangle tri, const xMaterial mat, HitRecord *rec)
+static inline bool intersect_triangle(const RAY ray, const xTriangle tri, const xMaterial mat, HitRecord *rec)
 {
     const Vec3 v0 = tri.v0;
     const Vec3 v1 = tri.v1;
@@ -268,7 +266,7 @@ static inline bool intersect_triangle(const Ray ray, const xTriangle tri, const 
     return true;
 }
 
-inline bool bvh_intersect(BVHNode *root, Ray ray, HitRecord *rec)
+inline bool bvh_intersect(BVHNode *root, const RAY ray, HitRecord *rec)
 {
     if (!root) return false;
     BVHNode *stack[STACK_SIZE];
