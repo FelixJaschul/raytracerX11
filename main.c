@@ -170,7 +170,7 @@ int main()
     // Main loop
     while (1)
     {
-        if (alpha == 360) { alpha = 0; } alpha++;
+        if (alpha == 630) { alpha = 0; } alpha++; // turn one time and reset
         printf("FPS: %.2f\n", xGetFPS(&win));
         const float move_speed = 0.03f;
 
