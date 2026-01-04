@@ -20,7 +20,7 @@
 
 #define EPSILON          0.001f
 #define RAY_OFFSET       0.0002f
-#define AMBIENT_STRENGTH 0.05f
+#define AMBIENT_STRENGTH 0.02f
 #define DIFFUSE_STRENGTH 0.8f
 
 #define MAX_BOUNCES 2
@@ -62,11 +62,11 @@ xModel* model(const char* path, xModel* storage, int* count, const Vec3 color, c
 // Scene setup
 void scene_init()
 {
-    model("res/rect.obj", scene_models, &num_models, vec3(0.73f, 0.73f, 0.73f), 0.0f, 0.0f);
-    model("res/rect.obj", scene_models, &num_models, vec3(0.73f, 0.73f, 0.73f), 0.0f, 0.0f);
-    model("res/rect.obj", scene_models, &num_models, vec3(0.73f, 0.73f, 0.73f), 0.0f, 0.0f);
-    model("res/rect.obj", scene_models, &num_models, vec3( 0.4f,  0.2f,  0.0f), 0.0f, 0.0f);
-    model("res/rect.obj", scene_models, &num_models, vec3( 0.5f,  0.0f,  0.2f), 0.0f, 0.0f);
+    model("res/rect.obj", scene_models, &num_models, vec3(0.19f, 0.19f, 0.19f), 0.0f, 0.0f);
+    model("res/rect.obj", scene_models, &num_models, vec3(0.02f, 0.02f, 0.02f), 0.0f, 0.0f);
+    model("res/rect.obj", scene_models, &num_models, vec3(0.02f, 0.02f, 0.02f), 0.0f, 0.0f);
+    model("res/rect.obj", scene_models, &num_models, vec3( 0.4f,  0.2f,  0.0f), 0.2f, 0.0f);
+    model("res/rect.obj", scene_models, &num_models, vec3( 0.5f,  0.0f,  0.2f), 0.2f, 0.0f);
     model("res/cube.obj", scene_models, &num_models, vec3( 1.0f,  1.0f,  1.0f), 0.0f, 1.0f);
     model("res/buny.obj", scene_models, &num_models, vec3(0.73f, 0.73f, 0.73f), 0.2f, 0.0f);
     xModelTransform(&scene_models[0], vec3(-1.0f, -1.0f,  1.0f), vec3(-M_PI/2, 0, 0), vec3(2.0f, 2.0f, 1.0f));
@@ -127,7 +127,7 @@ Vec3 calculate_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir
     Vec3 true_normal = normal;
     if (dot(true_normal, light_dir) < 0.0f) true_normal = mul(true_normal, -1.0f);
 
-    // Ambient lighting (reduced for more dramatic shadows)
+    // Ambient lighting
     const Vec3 ambient = mul(mat.color, AMBIENT_STRENGTH);
     if (is_shadow(point, true_normal, light_dir, light_dist)) return ambient;
 
