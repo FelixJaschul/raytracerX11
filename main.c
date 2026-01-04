@@ -52,9 +52,9 @@ BVHNode *bvh_root = NULL;
 #define TOGGLE_REFLECTIVITY 1
 #define WALL_REFLECTIVITY (0.3f * TOGGLE_REFLECTIVITY)
 
-xModel* model(const char* path, xModel* storage, int* count, const Vec3 color, const float refl)
+xModel* model(const char* path, xModel* storage, int* count, const Vec3 color, const float refl, const float spec)
 {
-    xModel *f = xModelCreate(storage, count, MAX_MODELS, color, WALL_REFLECTIVITY * refl, 0.0f);
+    xModel *f = xModelCreate(storage, count, MAX_MODELS, color, WALL_REFLECTIVITY * refl, spec);
     xModelLoad(f, path);
     return f;
 }
@@ -62,13 +62,20 @@ xModel* model(const char* path, xModel* storage, int* count, const Vec3 color, c
 // Scene setup
 void scene_init()
 {
-    model("res/rect.obj",  scene_models, &num_models, vec3(0.0f, 0.0f, 1.0f), 1.0f);
-    model("res/rect.obj",  scene_models, &num_models, vec3(0.0f, 1.0f, 0.0f), 1.0f);
-    model("res/rect.obj",  scene_models, &num_models, vec3(1.0f, 0.0f, 0.0f), 1.0f);
-    model("res/bunni.obj", scene_models, &num_models, vec3(1.0f, 1.0f, 1.0f), 0.3f);
-    xModelTransform(&scene_models[0], vec3(-2.0f,  0.0f,  2.0f), vec3(-M_PI/2, 0, 0), vec3(4.0f, 4.0f, 1.0f));
-    xModelTransform(&scene_models[1], vec3(-2.0f,  0.0f,  2.0f), vec3(0, -M_PI/2, 0), vec3(4.0f, 4.0f, 1.0f));
-    xModelTransform(&scene_models[2], vec3(-2.0f,  0.0f, -2.0f), vec3(0,       0, 0), vec3(4.0f, 4.0f, 1.0f));
+    model("res/rect.obj", scene_models, &num_models, vec3(0.73f, 0.73f, 0.73f), 0.0f, 0.0f);
+    model("res/rect.obj", scene_models, &num_models, vec3(0.73f, 0.73f, 0.73f), 0.0f, 0.0f);
+    model("res/rect.obj", scene_models, &num_models, vec3(0.73f, 0.73f, 0.73f), 0.0f, 0.0f);
+    model("res/rect.obj", scene_models, &num_models, vec3( 0.4f,  0.2f,  0.0f), 0.0f, 0.0f);
+    model("res/rect.obj", scene_models, &num_models, vec3( 0.5f,  0.0f,  0.2f), 0.0f, 0.0f);
+    model("res/cube.obj", scene_models, &num_models, vec3( 1.0f,  1.0f,  1.0f), 0.0f, 1.0f);
+    model("res/buny.obj", scene_models, &num_models, vec3(0.73f, 0.73f, 0.73f), 0.3f, 0.0f);
+    xModelTransform(&scene_models[0], vec3(-1.0f, -1.0f,  1.0f), vec3(-M_PI/2, 0, 0), vec3(2.0f, 2.0f, 1.0f));
+    xModelTransform(&scene_models[1], vec3(-1.0f,  1.0f, -1.0f), vec3( M_PI/2, 0, 0), vec3(2.0f, 2.0f, 1.0f));
+    xModelTransform(&scene_models[2], vec3(-1.0f, -1.0f, -1.0f), vec3(0,       0, 0), vec3(2.0f, 2.0f, 1.0f));
+    xModelTransform(&scene_models[3], vec3(-1.0f, -1.0f, -1.0f), vec3(0,  M_PI/2, 0), vec3(2.0f, 2.0f, 1.0f));
+    xModelTransform(&scene_models[4], vec3( 1.0f, -1.0f,  1.0f), vec3(0, -M_PI/2, 0), vec3(2.0f, 2.0f, 1.0f));
+    xModelTransform(&scene_models[5], vec3( 0.0f,  1.0f,  0.0f), vec3(0,       0, 0), vec3(0.5f, 0.01f,0.5f));
+    xModelTransform(&scene_models[6], vec3( 0.0f, -0.7f,  0.0f), vec3(0,       0, 0), vec3(6.0f, 6.0f, 6.0f));
 
     xModelUpdate(scene_models, num_models);
 
@@ -108,20 +115,25 @@ bool is_shadow(const Vec3 point, const Vec3 light_dir, const float light_distanc
 
 Vec3 calculate_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir, const xMaterial mat)
 {
-    const Vec3 light_pos = vec3(1.0f, 2.5f, 1.0f);
-    const float light_intensity = 5.0f;
+    // Light position centered on ceiling
+    const Vec3 light_pos = vec3(0.0f, 0.99f, 0.0f);
+    const float light_intensity = 8.0f;  // Increased for brighter lighting
     const Vec3 light_vec = sub(light_pos, point);
     const float light_dist_sq = dot(light_vec, light_vec);
     const float light_dist = sqrtf(light_dist_sq);
     const Vec3 light_dir = mul(light_vec, 1.0f / light_dist);
-    const Vec3 ambient = mul(mat.color, AMBIENT_STRENGTH);
+
+    // Ambient lighting (reduced for more dramatic shadows)
+    const Vec3 ambient = mul(mat.color, 0.1f);
 
     if (is_shadow(point, light_dir, light_dist)) return ambient;
 
-    const float attenuation = light_intensity / (light_dist_sq + 1.0f);
+    // Diffuse lighting
+    const float attenuation = light_intensity / (light_dist_sq + 0.1f);
     const float n_dot_l = fmaxf(dot(normal, light_dir), 0.0f);
-    const Vec3 diffuse = mul(mat.color, n_dot_l * DIFFUSE_STRENGTH * attenuation);
+    const Vec3 diffuse = mul(mat.color, n_dot_l * 0.9f * attenuation);
 
+    // Specular highlight
     const Vec3 reflect_dir = reflect(mul(light_dir, -1.0f), normal);
     float spec = fmaxf(dot(view_dir, reflect_dir), 0.0f);
     spec = powf(spec, 32.0f);
@@ -154,31 +166,12 @@ Vec3 calculate_ray_color(const RAY ray, const int depth)
     return vec3(0.0f, 0.0f, 0.0f); // Black background
 }
 
-void tonemap(Vec3 *color)
-{
-#define TONEMAP_ACESw
-#ifdef  TONEMAP_ACES
-    const float a = 2.51f;
-    const float b = 0.03f;
-    const float c = 2.43f;
-    const float d = 0.59f;
-    const float e = 0.14f;
-
-    color->x = (color->x * (a * color->x + b)) / (color->x * (c * color->x + d) + e);
-    color->y = (color->y * (a * color->y + b)) / (color->y * (c * color->y + d) + e);
-    color->z = (color->z * (a * color->z + b)) / (color->z * (c * color->z + d) + e);
-#else // Reinhard tonemap
-    color->x = color->x / (1.0f + color->x);
-    color->y = color->y / (1.0f + color->y);
-    color->z = color->z / (1.0f + color->z);
-#endif
-#undef TONEMAP_ACES
-}
-
 uint32_t uint32(Vec3 color)
 {
-    // 1. Tonemap from HDR to SDR (0-1 range)
-    tonemap(&color);
+    // 1. Tonemap from HDR to SDR (0-1 range) -> Reinhart
+    color.x = color.x / (1.0f + color.x);
+    color.y = color.y / (1.0f + color.y);
+    color.z = color.z / (1.0f + color.z);
 
     // 2. Clamp to SDR range
     color.x = CLAMP(color.x, 0.0f, 1.0f);
@@ -213,7 +206,7 @@ int main()
     // Initialize camera
     xCamera camera;
     xCameraInit(&camera);
-    camera.position = vec3(0.0f, 0.7f, 2.0f);
+    camera.position = vec3(0.0f, 0.0f, 2.0f);
     camera.yaw = -90.0f;
 
     // Load scene
@@ -237,7 +230,7 @@ int main()
         printf("FPS: %.2f\n", xGetFPS(&win));
         // Update xModel transform values
         if (alpha == 630) { alpha = 0; } alpha++; // turn one time and reset
-        xModelTransform(&scene_models[3], vec3(0.0f, -0.33f, 0.0f), vec3(0, alpha * 0.01f, 0), vec3(10.0f, 10.0f, 10.0f));
+        xModelTransform(&scene_models[6], vec3(0.0f, -0.8f, 0.0f), vec3(0, alpha * 0.01f, 0), vec3(6.0f, 6.0f, 6.0f));
 
         xModelUpdate(scene_models, num_models);
         bvh_free(bvh_root); // Free previous BVH
