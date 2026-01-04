@@ -132,6 +132,12 @@ static inline uint32_t uint32(const Vec3 color)
     return ((int)(r * 255) << 16) | ((int)(g * 255) << 8) | (int)(b * 255);
 }
 
+static inline Vec3 rotate_y_local(const Vec3 v, const float a)
+{
+    const float c = cosf(a), s = sinf(a);
+    return vec3(v.x * c - v.z * s, v.y, v.x * s + v.z * c);
+}
+
 int main()
 {
     // Initialize window
@@ -175,9 +181,6 @@ int main()
         const float move_speed = 0.03f;
 
         // Update xModel transform values
-        xModelTransform(&scene_models[0], vec3(-2.0f,  0.0f,  2.0f), vec3(alpha * (-M_PI/2), 0, 0), vec3(4.0f, 4.0f, 1.0f));
-        xModelTransform(&scene_models[1], vec3(-2.0f,  0.0f,  2.0f), vec3(0, alpha * (-M_PI/2), 0), vec3(4.0f, 4.0f, 1.0f));
-        xModelTransform(&scene_models[2], vec3(-2.0f,  0.0f, -2.0f), vec3(0, alpha * 1, 0), vec3(4.0f, 4.0f, 1.0f));
         xModelTransform(&scene_models[3], vec3(0.0f, -0.33f, 0.0f), vec3(0, alpha * 0.01f, 0), vec3(10.0f, 10.0f, 10.0f));
         xModelUpdate(scene_models, num_models); bvh_free(bvh_root); // Free previous BVH
         bvh_build(&bvh_root, scene_models, num_models);
