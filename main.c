@@ -155,7 +155,7 @@ int main()
     // Load scene
     scene_init();
 
-    // Precompute viewport offsets (once at startup, not per frame!)
+    // Precompute viewport offsets
     const float viewport_height = 2.0f;
     const float viewport_width = (float)win.width / (float)win.height * viewport_height;
 
