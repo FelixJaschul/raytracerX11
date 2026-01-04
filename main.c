@@ -116,8 +116,6 @@ Vec3 calculate_ray_color(const Ray ray, const int depth)
         {
             const Vec3 reflect_dir = reflect(ray.direction, rec.normal);
             const Ray reflect_ray = {rec.point, reflect_dir};
-            /*const Vec3 offset_origin = add(rec.point, mul(rec.normal, RAY_OFFSET));
-            const Ray reflect_ray = {offset_origin, reflect_dir};*/
             const Vec3 reflect_color = calculate_ray_color(reflect_ray, depth - 1);
             color = add(mul(color, 1.0f - adjusted_reflectivity), mul(reflect_color, adjusted_reflectivity));
         }
