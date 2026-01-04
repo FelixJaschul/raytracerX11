@@ -166,17 +166,17 @@ int main()
     for (int x = 0; x < win.width; x++)  u_offsets[x] = ((float)x / (float)(win.width - 1) - 0.5f) * viewport_width;
     for (int y = 0; y < win.height; y++) v_offsets[y] = ((float)(win.height - 1 - y) / (float)(win.height - 1) - 0.5f) * viewport_height;
 
-    int x = 0;
+    int alpha = 0;
     // Main loop
     while (1)
     {
-        if (x == 360) x = 0;
-        x++;
+        if (alpha == 360) alpha = 0;
+        alpha++;
         printf("FPS: %.2f\n", xGetFPS(&win));
         const float move_speed = 0.03f;
 
         // Update bunni rotation
-        xModelTransform(&scene_models[3], vec3(0.0f, -0.33f, 0.0f), vec3(0, x * 0.01f, 0), vec3(10.0f, 10.0f, 10.0f));
+        xModelTransform(&scene_models[3], vec3(0.0f, -0.33f, 0.0f), vec3(0, alpha * 0.01f, 0), vec3(10.0f, 10.0f, 10.0f));
         xModelUpdate(scene_models, num_models); bvh_free(bvh_root); // Free previous BVH
         bvh_build(&bvh_root, scene_models, num_models);
 
