@@ -201,15 +201,15 @@ int main()
             {
                 // Process tile
                 const int y_end = (ty + TILE_SIZE < win.height) ? ty + TILE_SIZE : win.height;
-                const int x_end = (tx + TILE_SIZE < win.width) ? tx + TILE_SIZE : win.width;
+                const int x_end = (tx + TILE_SIZE < win.width ) ? tx + TILE_SIZE : win.width;
 
                 for (int y = ty; y < y_end; y++)
                 {
+                    uint32_t* restrict row = &win.buffer[y * win.width];
                     for (int x = tx; x < x_end; x++)
                     {
                         const Ray ray = xCameraGetRay(&camera, u_offsets[x], v_offsets[y]);
-                        const Vec3 color = calculate_ray_color(ray, MAX_BOUNCES);
-                        win.buffer[y * win.width + x] = uint32(color);
+                        row[x] = uint32(calculate_ray_color(ray, MAX_BOUNCES));
                     }
                 }
             }
