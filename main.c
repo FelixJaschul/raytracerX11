@@ -42,27 +42,30 @@ xModel scene_models[MAX_MODELS];
 int num_models = 0;
 BVHNode *bvh_root = NULL;
 
+#define TOGGLE_REFLECTIVITY 1
+#define WALL_REFLECTIVITY (0.3f * TOGGLE_REFLECTIVITY)
+
+xModel* model(const char* path, xModel* storage, int* count, const Vec3 color, const float refl)
+{
+    xModel *f = xModelCreate(storage, count, MAX_MODELS, color, WALL_REFLECTIVITY * refl);
+    xModelLoad(f, path);
+    return f;
+}
+
 // Scene setup
 void scene_init()
 {
-    #define TOGGLE_REFLECTIVITY 1
-    #define WALL_REFLECTIVITY (0.3f * TOGGLE_REFLECTIVITY)
+    xModel *fw = model("res/rect.obj", scene_models, &num_models, vec3(0.0f, 0.0f, 1.0f), 1.0f);
+    xModelTransform(fw, vec3(-2.0f, 0.0f, 2.0f), vec3(-M_PI/2, 0, 0), vec3(4.0f, 4.0f, 1.0f));
 
-    xModel *f = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(0.0f, 0.0f, 1.0f), WALL_REFLECTIVITY);
-    xModelLoad(f, "res/rect.obj");
-    xModelTransform(f, vec3(-2.0f, 0.0f, 2.0f), vec3(-M_PI/2, 0, 0), vec3(4.0f, 4.0f, 1.0f));
-
-    xModel *lw = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 0.0f, 0.0f), WALL_REFLECTIVITY);
-    xModelLoad(lw, "res/rect.obj");
+    xModel *lw = model("res/rect.obj", scene_models, &num_models, vec3(1.0f, 0.0f, 0.0f), 1.0f);
     xModelTransform(lw, vec3(-2.0f, 0.0f, 2.0f), vec3(0, -M_PI/2, 0), vec3(4.0f, 4.0f, 1.0f));
 
-    xModel *bw = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(0.0f, 1.0f, 0.0f), WALL_REFLECTIVITY);
-    xModelLoad(bw, "res/rect.obj");
+    xModel *bw = model("res/rect.obj", scene_models, &num_models, vec3(0.0f, 1.0f, 0.0f), 1.0f);
     xModelTransform(bw, vec3(-2.0f, 0.0f, -2.0f), vec3(0, 0, 0), vec3(4.0f, 4.0f, 1.0f));
 
-    xModel *bunni = xModelCreate(scene_models, &num_models, MAX_MODELS, vec3(1.0f, 1.0f, 1.0f), 0.3f * TOGGLE_REFLECTIVITY);
-    xModelLoad(bunni, "res/bunni.obj");
-    xModelTransform(bunni, vec3(0.0f, -0.33f, 0.0f), vec3(0, 0, 0), vec3(10.0f, 10.0f, 10.0f));
+    xModel *bo = model("res/bunni.obj", scene_models, &num_models, vec3(1.0f, 1.0f, 1.0f), 0.3f);
+    xModelTransform(bo, vec3(0.0f, -0.33f, 0.0f), vec3(0, 0, 0), vec3(10.0f, 10.0f, 10.0f));
 
     xModelUpdate(scene_models, num_models);
 
@@ -70,6 +73,9 @@ void scene_init()
     bvh_root = bvh_build(scene_models, num_models);
     printf("BVH built: %s\n", bvh_root ? "YES" : "NO");
 }
+
+#undef TOGGLE_REFLECTIVITY
+#undef WALL_REFLECTIVITY
 
 bool trace_scene(const Ray ray, HitRecord *rec)
 {
@@ -169,11 +175,17 @@ int main()
     for (int x = 0; x < win.width; x++)  u_offsets[x] = ((float)x / (float)(win.width - 1) - 0.5f) * viewport_width;
     for (int y = 0; y < win.height; y++) v_offsets[y] = ((float)(win.height - 1 - y) / (float)(win.height - 1) - 0.5f) * viewport_height;
 
+    int x = 0;
     // Main loop
     while (1)
     {
+        if (x == 360) x = 0;
+        x++;
         printf("FPS: %.2f\n", xGetFPS(&win));
         const float move_speed = 0.03f;
+
+        xModel *fw = model("res/rect.obj", scene_models, &num_models, vec3(0.0f, 0.0f, 1.0f), 1.0f);
+        xModelTransform(fw, vec3(-2.0f, 0.0f, 2.0f), vec3((-M_PI/2) + x, 0, 0), vec3(4.0f, 4.0f, 1.0f));
 
         // Poll events with explicit input state
         if (xPollEvents(win.display, &input)) break;
