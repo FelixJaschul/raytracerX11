@@ -89,7 +89,7 @@ static inline RAY make_ray(const Vec3 origin, const Vec3 direction)
     return r;
 }
 
-bool trace_scene(const RAY ray, HitRecord *rec, int model_idx)
+bool trace_scene(const RAY ray, HitRecord *rec)
 {
     rec->hit = false;
     rec->t   = FLT_MAX;
@@ -98,17 +98,12 @@ bool trace_scene(const RAY ray, HitRecord *rec, int model_idx)
 
 bool is_shadow(const Vec3 point, const Vec3 light_dir, const float light_distance)
 {
-#define SHADOW
-#ifdef  SHADOW
     const RAY shadow_ray = make_ray(point, light_dir);
     HitRecord rec;
     rec.hit = false;
     rec.t = light_distance - EPSILON; // Only check up to light
 
     return bvh_intersect(bvh_root, shadow_ray, &rec);
-#else
-    return false;
-#endif
 }
 
 Vec3 calculate_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir, const xMaterial mat)
@@ -138,7 +133,7 @@ Vec3 calculate_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir
 Vec3 calculate_ray_color(const RAY ray, const int depth)
 {
     HitRecord rec;
-    if (trace_scene(ray, &rec, -1))
+    if (trace_scene(ray, &rec))
     {
         const Vec3 view_dir = mul(ray.direction, -1.0f);
         Vec3 color = calculate_lighting(rec.point, rec.normal, view_dir, rec.mat);
@@ -161,7 +156,7 @@ Vec3 calculate_ray_color(const RAY ray, const int depth)
 
 void tonemap(Vec3 *color)
 {
-#define TONEMAP_ACES
+#define TONEMAP_ACESw
 #ifdef  TONEMAP_ACES
     const float a = 2.51f;
     const float b = 0.03f;
