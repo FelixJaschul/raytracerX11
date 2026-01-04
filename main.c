@@ -68,7 +68,7 @@ void scene_init()
     model("res/rect.obj", scene_models, &num_models, vec3( 0.4f,  0.2f,  0.0f), 0.0f, 0.0f);
     model("res/rect.obj", scene_models, &num_models, vec3( 0.5f,  0.0f,  0.2f), 0.0f, 0.0f);
     model("res/cube.obj", scene_models, &num_models, vec3( 1.0f,  1.0f,  1.0f), 0.0f, 1.0f);
-    // model("res/buny.obj", scene_models, &num_models, vec3(0.73f, 0.73f, 0.73f), 0.3f, 0.0f);
+    model("res/buny.obj", scene_models, &num_models, vec3(0.73f, 0.73f, 0.73f), 0.3f, 0.0f);
     xModelTransform(&scene_models[0], vec3(-1.0f, -1.0f,  1.0f), vec3(-M_PI/2, 0, 0), vec3(2.0f, 2.0f, 1.0f));
     xModelTransform(&scene_models[1], vec3(-1.0f,  1.0f, -1.0f), vec3( M_PI/2, 0, 0), vec3(2.0f, 2.0f, 1.0f));
     xModelTransform(&scene_models[2], vec3(-1.0f, -1.0f, -1.0f), vec3(0,       0, 0), vec3(2.0f, 2.0f, 1.0f));
