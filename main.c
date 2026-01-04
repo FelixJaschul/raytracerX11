@@ -68,7 +68,7 @@ void scene_init()
     model("res/rect.obj", scene_models, &num_models, vec3( 0.4f,  0.2f,  0.0f), 0.0f, 0.0f);
     model("res/rect.obj", scene_models, &num_models, vec3( 0.5f,  0.0f,  0.2f), 0.0f, 0.0f);
     model("res/cube.obj", scene_models, &num_models, vec3( 1.0f,  1.0f,  1.0f), 0.0f, 1.0f);
-    model("res/buny.obj", scene_models, &num_models, vec3(0.73f, 0.73f, 0.73f), 0.3f, 0.0f);
+    model("res/buny.obj", scene_models, &num_models, vec3(0.73f, 0.73f, 0.73f), 0.2f, 0.0f);
     xModelTransform(&scene_models[0], vec3(-1.0f, -1.0f,  1.0f), vec3(-M_PI/2, 0, 0), vec3(2.0f, 2.0f, 1.0f));
     xModelTransform(&scene_models[1], vec3(-1.0f,  1.0f, -1.0f), vec3( M_PI/2, 0, 0), vec3(2.0f, 2.0f, 1.0f));
     xModelTransform(&scene_models[2], vec3(-1.0f, -1.0f, -1.0f), vec3(0,       0, 0), vec3(2.0f, 2.0f, 1.0f));
@@ -172,6 +172,9 @@ Vec3 calculate_ray_color(const RAY ray, const int depth)
 uint32_t uint32(Vec3 color)
 {
     // 1. Tonemap from HDR to SDR (0-1 range) -> Reinhart
+    color.x = color.x / (1.0f + color.x);
+    color.y = color.y / (1.0f + color.y);
+    color.z = color.z / (1.0f + color.z);
 
     // 2. Clamp to SDR range
     color.x = CLAMP(color.x, 0.0f, 1.0f);
