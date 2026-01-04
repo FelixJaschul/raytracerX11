@@ -115,31 +115,32 @@ bool is_shadow(const Vec3 point, const Vec3 normal, const Vec3 light_dir, const 
 
 Vec3 calculate_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir, const xMaterial mat)
 {
-    // Directional light - all rays come from the same direction
-    const Vec3 light_dir = norm(vec3(0.3f, -1.0f, 0.2f)); // Direction light comes FROM
-    const float light_intensity = 2.5f;
+    // Light position centered on ceiling
+    const Vec3 light_pos = vec3(0.0f, 0.99f, 0.0f);
+    const float light_intensity = 8.0f;  // Increased for brighter lighting
+    const Vec3 light_vec = sub(light_pos, point);
+    const float light_dist_sq = dot(light_vec, light_vec);
+    const float light_dist = sqrtf(light_dist_sq);
+    const Vec3 light_dir = mul(light_vec, 1.0f / light_dist);
 
-    // For directional light, we cast shadow rays with a very large distance
-    const float shadow_distance = 1000.0f;
+    // Ensure normal is facing the light
     Vec3 true_normal = normal;
     if (dot(true_normal, light_dir) < 0.0f) true_normal = mul(true_normal, -1.0f);
 
-    // Ambient lighting
+    // Ambient lighting (reduced for more dramatic shadows)
     const Vec3 ambient = mul(mat.color, AMBIENT_STRENGTH);
+    if (is_shadow(point, true_normal, light_dir, light_dist)) return ambient;
 
-    // Check if in shadow (for directional light, we use the light direction directly)
-    const Vec3 shadow_dir = mul(light_dir, -1.0f); // Flip direction for shadow ray
-    if (is_shadow(point, true_normal, shadow_dir, shadow_distance)) return ambient;
-
-    // Diffuse lighting (no attenuation for directional light)
-    const float n_dot_l = fmaxf(dot(normal, shadow_dir), 0.0f);
-    const Vec3 diffuse = mul(mat.color, n_dot_l * DIFFUSE_STRENGTH * light_intensity);
+    // Diffuse lighting
+    const float attenuation = light_intensity / (light_dist_sq + 0.1f);
+    const float n_dot_l = fmaxf(dot(true_normal, light_dir), 0.0f);
+    const Vec3 diffuse = mul(mat.color, n_dot_l * 0.9f * attenuation);
 
     // Specular highlight
-    const Vec3 reflect_dir = reflect(light_dir, normal);
+    const Vec3 reflect_dir = reflect(mul(light_dir, -1.0f), true_normal);
     float spec = fmaxf(dot(view_dir, reflect_dir), 0.0f);
     spec = powf(spec, 32.0f);
-    const Vec3 specular = mul(vec3(1,1,1), spec * mat.specular * light_intensity * 0.5f);
+    const Vec3 specular = mul(vec3(1,1,1), spec * mat.specular * attenuation);
 
     return add(add(ambient, diffuse), specular);
 }
