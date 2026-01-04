@@ -161,7 +161,7 @@ Vec3 calculate_ray_color(const RAY ray, const int depth)
 
 void tonemap(Vec3 *color)
 {
-#define TONEMAP_ACES
+#define TONEMAP_ACESw
 #ifdef  TONEMAP_ACES
     const float a = 2.51f;
     const float b = 0.03f;
