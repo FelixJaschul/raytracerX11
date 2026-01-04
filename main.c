@@ -123,18 +123,21 @@ Vec3 calculate_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir
     const float light_dist = sqrtf(light_dist_sq);
     const Vec3 light_dir = mul(light_vec, 1.0f / light_dist);
 
+    // Ensure normal is facing the light
+    Vec3 true_normal = normal;
+    if (dot(true_normal, light_dir) < 0.0f) true_normal = mul(true_normal, -1.0f);
+
     // Ambient lighting (reduced for more dramatic shadows)
     const Vec3 ambient = mul(mat.color, AMBIENT_STRENGTH);
-
-    if (is_shadow(point, normal, light_dir, light_dist)) return ambient;
+    if (is_shadow(point, true_normal, light_dir, light_dist)) return ambient;
 
     // Diffuse lighting
     const float attenuation = light_intensity / (light_dist_sq + 0.1f);
-    const float n_dot_l = fmaxf(dot(normal, light_dir), 0.0f);
+    const float n_dot_l = fmaxf(dot(true_normal, light_dir), 0.0f);
     const Vec3 diffuse = mul(mat.color, n_dot_l * 0.9f * attenuation);
 
     // Specular highlight
-    const Vec3 reflect_dir = reflect(mul(light_dir, -1.0f), normal);
+    const Vec3 reflect_dir = reflect(mul(light_dir, -1.0f), true_normal);
     float spec = fmaxf(dot(view_dir, reflect_dir), 0.0f);
     spec = powf(spec, 32.0f);
     const Vec3 specular = mul(vec3(1,1,1), spec * mat.specular * attenuation);
