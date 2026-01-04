@@ -55,14 +55,13 @@ xModel* model(const char* path, xModel* storage, int* count, const Vec3 color, c
 // Scene setup
 void scene_init()
 {
-    xModel *fw = model("res/rect.obj", scene_models, &num_models, vec3(0.0f, 0.0f, 1.0f), 1.0f);
-    xModelTransform(fw, vec3(-2.0f, 0.0f, 2.0f), vec3(-M_PI/2, 0, 0), vec3(4.0f, 4.0f, 1.0f));
-
-    xModel *lw = model("res/rect.obj", scene_models, &num_models, vec3(1.0f, 0.0f, 0.0f), 1.0f);
-    xModelTransform(lw, vec3(-2.0f, 0.0f, 2.0f), vec3(0, -M_PI/2, 0), vec3(4.0f, 4.0f, 1.0f));
-
-    xModel *bw = model("res/rect.obj", scene_models, &num_models, vec3(0.0f, 1.0f, 0.0f), 1.0f);
-    xModelTransform(bw, vec3(-2.0f, 0.0f, -2.0f), vec3(0, 0, 0), vec3(4.0f, 4.0f, 1.0f));
+    model("res/rect.obj", scene_models, &num_models, vec3(0.0f, 0.0f, 1.0f), 1.0f);
+    model("res/rect.obj", scene_models, &num_models, vec3(0.0f, 1.0f, 0.0f), 1.0f);
+    model("res/rect.obj", scene_models, &num_models, vec3(1.0f, 0.0f, 0.0f), 1.0f);
+    model("res/bunni.obj", scene_models, &num_models, vec3(1.0f, 1.0f, 1.0f), 0.3f);
+    xModelTransform(&scene_models[0], vec3(-2.0f, 0.0f, 2.0f), vec3(-M_PI/2, 0, 0), vec3(4.0f, 4.0f, 1.0f));
+    xModelTransform(&scene_models[1], vec3(-2.0f, 0.0f, 2.0f), vec3(0, -M_PI/2, 0), vec3(4.0f, 4.0f, 1.0f));
+    xModelTransform(&scene_models[2], vec3(-2.0f, 0.0f, -2.0f), vec3(0, 0, 0), vec3(4.0f, 4.0f, 1.0f));
 
     xModelUpdate(scene_models, num_models);
 
@@ -160,7 +159,6 @@ int main()
 
     // Load scene
     scene_init();
-    model("res/bunni.obj", scene_models, &num_models, vec3(1.0f, 1.0f, 1.0f), 0.3f);
 
     // Precompute viewport offsets (once at startup, not per frame!)
     const float viewport_height = 2.0f;
