@@ -172,9 +172,6 @@ Vec3 calculate_ray_color(const RAY ray, const int depth)
 uint32_t uint32(Vec3 color)
 {
     // 1. Tonemap from HDR to SDR (0-1 range) -> Reinhart
-    color.x = color.x / (1.0f + color.x);
-    color.y = color.y / (1.0f + color.y);
-    color.z = color.z / (1.0f + color.z);
 
     // 2. Clamp to SDR range
     color.x = CLAMP(color.x, 0.0f, 1.0f);
