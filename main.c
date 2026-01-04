@@ -158,6 +158,15 @@ int main()
     camera.position = vec3(0.0f, 0.7f, 2.0f);
     camera.yaw = -90.0f;
 
+    xCamera camera_2d;
+    xCameraInit(&camera_2d);
+    camera_2d.position = vec3(0.0f, 5.0f, 0.0f);
+    camera_2d.pitch = -89.0f;
+    camera_2d.yaw = -90.0f;
+    xCameraUpdate(&camera_2d);
+
+    bool is_2d_view = false;
+
     // Load scene
     scene_init();
 
@@ -188,23 +197,32 @@ int main()
         // Poll events with explicit input state
         if (xPollEvents(win.display, &input)) break;
         if (xIsKeyPressed(&input, KEY_ESCAPE)) break;
+        if (xIsKeyPressed(&input, KEY_M)) is_2d_view = !is_2d_view;
 
-        // Mouse look
-        int dx, dy;
-        xGetMouseDelta(&input, &dx, &dy);
-        xGrabMouse(win.display, win.window, win.width, win.height, &input);
-        xCameraRotate(&camera, dx * SENS_X, -dy * SENS_Y);
+        if (!is_2d_view)
+        {
+            // Mouse look
+            int dx, dy;
+            xGetMouseDelta(&input, &dx, &dy);
+            xGrabMouse(win.display, win.window, win.width, win.height, &input);
+            xCameraRotate(&camera, dx * SENS_X, -dy * SENS_Y);
 
-        // Keyboard movement
-        if (xIsKeyDown(&input, KEY_W)) xCameraMove(&camera, camera.front, move_speed);
-        if (xIsKeyDown(&input, KEY_S)) xCameraMove(&camera, mul(camera.front, -1), move_speed);
-        if (xIsKeyDown(&input, KEY_A)) xCameraMove(&camera, mul(camera.right, -1), move_speed);
-        if (xIsKeyDown(&input, KEY_D)) xCameraMove(&camera, camera.right, move_speed);
-        if (xIsKeyDown(&input, KEY_Q)) xCameraMove(&camera, vec3(0, -1, 0), move_speed);
-        if (xIsKeyDown(&input, KEY_E)) xCameraMove(&camera, vec3(0, 1, 0), move_speed);
+            // Keyboard movement
+            if (xIsKeyDown(&input, KEY_W)) xCameraMove(&camera, camera.front, move_speed);
+            if (xIsKeyDown(&input, KEY_S)) xCameraMove(&camera, mul(camera.front, -1), move_speed);
+            if (xIsKeyDown(&input, KEY_A)) xCameraMove(&camera, mul(camera.right, -1), move_speed);
+            if (xIsKeyDown(&input, KEY_D)) xCameraMove(&camera, camera.right, move_speed);
+            if (xIsKeyDown(&input, KEY_Q)) xCameraMove(&camera, vec3(0, -1, 0), move_speed);
+            if (xIsKeyDown(&input, KEY_E)) xCameraMove(&camera, vec3(0, 1, 0), move_speed);
+        }
+        else
+        {
+            xReleaseMouse(win.display, win.window, &input);
+        }
 
         // Render
-        #pragma omp parallel for schedule(dynamic) collapse(2) default(none) shared(win, camera, u_offsets, v_offsets)
+        xCamera *active_cam = is_2d_view ? &camera_2d : &camera;
+        #pragma omp parallel for schedule(dynamic) collapse(2) default(none) shared(win, active_cam, u_offsets, v_offsets)
         for (int ty = 0; ty < win.height; ty += TILE_SIZE)
         {
             for (int tx = 0; tx < win.width; tx += TILE_SIZE)
@@ -218,7 +236,7 @@ int main()
                     uint32_t* restrict row = &win.buffer[y * win.width];
                     for (int x = tx; x < x_end; x++)
                     {
-                        const Ray ray = xCameraGetRay(&camera, u_offsets[x], v_offsets[y]);
+                        const Ray ray = xCameraGetRay(active_cam, u_offsets[x], v_offsets[y]);
                         row[x] = uint32(calculate_ray_color(ray, MAX_BOUNCES));
                     }
                 }
