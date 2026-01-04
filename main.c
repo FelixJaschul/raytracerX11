@@ -47,7 +47,7 @@ BVHNode *bvh_root = NULL;
 
 xModel* model(const char* path, xModel* storage, int* count, const Vec3 color, const float refl)
 {
-    xModel *f = xModelCreate(storage, count, MAX_MODELS, color, WALL_REFLECTIVITY * refl);
+    xModel *f = xModelCreate(storage, count, MAX_MODELS, color, WALL_REFLECTIVITY * refl, 0.0f);
     xModelLoad(f, path);
     return f;
 }
