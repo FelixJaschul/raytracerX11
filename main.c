@@ -117,7 +117,7 @@ Vec3 calculate_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir
 {
     // Light position centered on ceiling
     const Vec3 light_pos = vec3(0.0f, 0.99f, 0.0f);
-    const float light_intensity = 8.0f;  // Increased for brighter lighting
+    const float light_intensity = 2.0f;
     const Vec3 light_vec = sub(light_pos, point);
     const float light_dist_sq = dot(light_vec, light_vec);
     const float light_dist = sqrtf(light_dist_sq);
@@ -171,22 +171,17 @@ Vec3 calculate_ray_color(const RAY ray, const int depth)
 
 uint32_t uint32(Vec3 color)
 {
-    // 1. Tonemap from HDR to SDR (0-1 range) -> Reinhart
-    color.x = color.x / (1.0f + color.x);
-    color.y = color.y / (1.0f + color.y);
-    color.z = color.z / (1.0f + color.z);
-
-    // 2. Clamp to SDR range
+    // 1. Clamp to SDR range
     color.x = CLAMP(color.x, 0.0f, 1.0f);
     color.y = CLAMP(color.y, 0.0f, 1.0f);
     color.z = CLAMP(color.z, 0.0f, 1.0f);
 
-    // 3. Apply gamma correction
+    // 2. Apply gamma correction
     color = vec3(
         powf(color.x, 1.0f / 2.2f),
         powf(color.y, 1.0f / 2.2f),
         powf(color.z, 1.0f / 2.2f)
-    );;
+    );
 
     // 4. Convert to 8-bit integer
     return ((int)(color.x * 255) << 16) | ((int)(color.y * 255) << 8) | (int)(color.z * 255);
