@@ -36,7 +36,7 @@ typedef struct BVHNode {
 /*  -> Example:
  *  BVHNode* root = bvh_build(models, num_models);
  */
-BVHNode* bvh_build(const xModel *models, int num);
+static inline void bvh_build(BVHNode **root, const xModel *models, int num);
 
 // Free all resources used by BVH
 void bvh_free(BVHNode *n);
@@ -184,17 +184,17 @@ static BVHNode* build(Item *items, const int n)
     }
 
     node->count = 0;
-    node->tris  = node->mats = NULL;
+    node->tris = NULL;
+    node->mats = NULL;
     node->left  = build(items, best_split);
     node->right = build(items + best_split, n - best_split);
     return node;
 }
 
-inline BVHNode* bvh_build(const xModel *models, const int num)
+static inline void bvh_build(BVHNode **root, const xModel *models, const int num)
 {
     int total = 0;
     for (int i = 0; i < num; i++) total += models[i].num_triangles;
-    if (!total) return NULL;
 
     Item *items = malloc(total * sizeof(Item));
     int idx = 0;
@@ -211,9 +211,8 @@ inline BVHNode* bvh_build(const xModel *models, const int num)
         }
     }
 
-    BVHNode *root = build(items, total);
+    *root = build(items, total);
     free(items);
-    return root;
 }
 
 inline void bvh_free(BVHNode *n)

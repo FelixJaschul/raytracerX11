@@ -64,13 +64,10 @@ void scene_init()
     xModel *bw = model("res/rect.obj", scene_models, &num_models, vec3(0.0f, 1.0f, 0.0f), 1.0f);
     xModelTransform(bw, vec3(-2.0f, 0.0f, -2.0f), vec3(0, 0, 0), vec3(4.0f, 4.0f, 1.0f));
 
-    xModel *bo = model("res/bunni.obj", scene_models, &num_models, vec3(1.0f, 1.0f, 1.0f), 0.3f);
-    xModelTransform(bo, vec3(0.0f, -0.33f, 0.0f), vec3(0, 0, 0), vec3(10.0f, 10.0f, 10.0f));
-
     xModelUpdate(scene_models, num_models);
 
     // Build BVH after all models are loaded and transformed
-    bvh_root = bvh_build(scene_models, num_models);
+    bvh_build(&bvh_root, scene_models, num_models);
     printf("BVH built: %s\n", bvh_root ? "YES" : "NO");
 }
 
@@ -163,6 +160,7 @@ int main()
 
     // Load scene
     scene_init();
+    model("res/bunni.obj", scene_models, &num_models, vec3(1.0f, 1.0f, 1.0f), 0.3f);
 
     // Precompute viewport offsets (once at startup, not per frame!)
     const float viewport_height = 2.0f;
@@ -184,8 +182,10 @@ int main()
         printf("FPS: %.2f\n", xGetFPS(&win));
         const float move_speed = 0.03f;
 
-        xModel *fw = model("res/rect.obj", scene_models, &num_models, vec3(0.0f, 0.0f, 1.0f), 1.0f);
-        xModelTransform(fw, vec3(-2.0f, 0.0f, 2.0f), vec3((-M_PI/2) + x, 0, 0), vec3(4.0f, 4.0f, 1.0f));
+        // Update bunni rotation
+        xModelTransform(&scene_models[3], vec3(0.0f, -0.33f, 0.0f), vec3(0, x * 0.01f, 0), vec3(10.0f, 10.0f, 10.0f));
+        xModelUpdate(scene_models, num_models); bvh_free(bvh_root); // Free previous BVH
+        bvh_build(&bvh_root, scene_models, num_models);
 
         // Poll events with explicit input state
         if (xPollEvents(win.display, &input)) break;
