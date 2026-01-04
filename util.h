@@ -1,5 +1,5 @@
 // ============================================================================
-// xBvd.h - Bounding Volume Hierarchy for fast ray-triangle intersection
+// xUtil.h - Bounding Volume Hierarchy for fast ray-triangle intersection
 // ============================================================================
 #ifndef UTIL_H
 #define UTIL_H
