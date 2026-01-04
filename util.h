@@ -241,7 +241,7 @@ static inline bool intersect_triangle(const RAY ray, const xTriangle tri, const 
     const Vec3 h = cross(ray.direction, edge2);
     const float a = dot(edge1, h);
 
-    // if (fabsf(a) < EPSILON) return false;
+    if (fabsf(a) < 1e-6f) return false;
 
     const float f = 1.0f / a;
     const Vec3 s = sub(ray.origin, v0);
