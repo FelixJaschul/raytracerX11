@@ -27,8 +27,8 @@ typedef struct {
 typedef struct BVHNode {
     AABB bounds;
     struct BVHNode *left, *right;
-    xTriangle *tris;
-    xMaterial *mats;
+    Triangle *tris;
+    Material *mats;
     int count;
 } BVHNode;
 
@@ -36,7 +36,7 @@ typedef struct BVHNode {
 /*  -> Example:
  *  BVHNode* root = bvh_build(models, num_models);
  */
-static inline void bvh_build(BVHNode **root, const xModel *models, int num);
+static inline void bvh_build(BVHNode **root, const Model *models, int num);
 
 // Free all resources used by BVH
 void bvh_free(BVHNode *n);
@@ -46,7 +46,7 @@ void bvh_free(BVHNode *n);
  *  HitRecord rec = { .hit = false, .t = 1e30f };
  *  if (bvh_intersect(root, ray, &rec)) { ... }
  */
-bool bvh_intersect(BVHNode *root, RAY ray, HitRecord *rec);
+bool bvh_intersect(BVHNode *root, BvhRay ray, HitRecord *rec);
 
 #ifdef __cplusplus
 }
@@ -55,13 +55,13 @@ bool bvh_intersect(BVHNode *root, RAY ray, HitRecord *rec);
 #ifdef UTIL_IMPLEMENTATION
 
 typedef struct {
-    xTriangle tri;
-    xMaterial mat;
+    Triangle tri;
+    Material mat;
     Vec3 center;
 } Item;
 
 // Internal helpers
-static inline AABB box_tri(const xTriangle t)
+static inline AABB box_tri(const Triangle t)
 {
     AABB b;
     b.min.x = fminf(fminf(t.v0.x,t.v1.x),t.v2.x);
@@ -90,7 +90,7 @@ static inline float box_surface_area(const AABB box)
 }
 
 // Optimized AABB intersection using precomputed inverse direction
-static inline bool box_hit(const AABB box, const RAY r, float tmin, float tmax)
+static inline bool box_hit(const AABB box, const BvhRay r, float tmin, float tmax)
 {
     // Use precomputed inverse direction instead of computing 1.0f / r.direction
     const float t0x = (box.min.x - r.origin.x) * r.inv_direction.x;
@@ -133,8 +133,8 @@ static BVHNode* build(Item *items, const int n)
     if (n <= LEAF_SIZE)
     {
         node->count = n;
-        node->tris = malloc(n * sizeof(xTriangle));
-        node->mats = malloc(n * sizeof(xMaterial));
+        node->tris = malloc(n * sizeof(Triangle));
+        node->mats = malloc(n * sizeof(Material));
         for (int i = 0; i < n; i++)
         {
             node->tris[i] = items[i].tri;
@@ -189,7 +189,7 @@ static BVHNode* build(Item *items, const int n)
     return node;
 }
 
-static inline void bvh_build(BVHNode **root, const xModel *models, const int num)
+static inline void bvh_build(BVHNode **root, const Model *models, const int num)
 {
     int total = 0;
     for (int i = 0; i < num; i++) total += models[i].num_triangles;
@@ -198,12 +198,12 @@ static inline void bvh_build(BVHNode **root, const xModel *models, const int num
     int idx = 0;
     for (int i = 0; i < num; i++)
     {
-        const xModel *m = &models[i];
+        const Model *m = &models[i];
         for (int j = 0; j < m->num_triangles; j++)
         {
             items[idx].tri = m->transformed_triangles[j];
             items[idx].mat = m->mat;
-            const xTriangle t = m->transformed_triangles[j];
+            const Triangle t = m->transformed_triangles[j];
             items[idx].center = vec3((t.v0.x+t.v1.x+t.v2.x)/3.0f, (t.v0.y+t.v1.y+t.v2.y)/3.0f, (t.v0.z+t.v1.z+t.v2.z)/3.0f);
             idx++;
         }
@@ -229,7 +229,7 @@ inline void bvh_free(BVHNode *n)
     free(n);
 }
 
-static inline bool intersect_triangle(const RAY ray, const xTriangle tri, const xMaterial mat, HitRecord *rec)
+static inline bool intersect_triangle(const BvhRay ray, const Triangle tri, const Material mat, HitRecord *rec)
 {
     const Vec3 v0 = tri.v0;
     const Vec3 v1 = tri.v1;
@@ -266,7 +266,7 @@ static inline bool intersect_triangle(const RAY ray, const xTriangle tri, const 
     return true;
 }
 
-inline bool bvh_intersect(BVHNode *root, const RAY ray, HitRecord *rec)
+inline bool bvh_intersect(BVHNode *root, const BvhRay ray, HitRecord *rec)
 {
     if (!root) return false;
     BVHNode *stack[STACK_SIZE];

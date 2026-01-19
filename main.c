@@ -5,11 +5,12 @@
 #include <float.h>
 #include <stdint.h>
 
-#define XKEYS_IMPLEMENTATION
-#define XMATH_IMPLEMENTATION
-#define XCAMERA_IMPLEMENTATION
-#define XMODEL_IMPLEMENTATION
-#include <wrapperX11/x11.h>
+#define CORE_IMPLEMENTATION
+#define KEYS_IMPLEMENTATION
+#define MATH_IMPLEMENTATION
+#define CAMERA_IMPLEMENTATION
+#define MODEL_IMPLEMENTATION
+#include <wrapper/core.h>
 
 #define XTITLE "X11"
 #define XFPS 120
@@ -32,30 +33,30 @@ typedef struct {
     Vec3 direction;
     // Precomputed inverse for AABB tests
     Vec3 inv_direction;
-} RAY;
+} BvhRay;
 
 typedef struct {
     bool hit;
     float t;
     Vec3 point;
     Vec3 normal;
-    xMaterial mat;
+    Material mat;
 } HitRecord;
 
 #define UTIL_IMPLEMENTATION
 #include "util.h"
 
-xModel scene_models[MAX_MODELS];
+Model scene_models[MAX_MODELS];
 int num_models = 0;
 BVHNode *bvh_root = NULL;
 
 #define TOGGLE_REFLECTIVITY 1
 #define WALL_REFLECTIVITY (0.3f * TOGGLE_REFLECTIVITY)
 
-xModel* model(const char* path, xModel* storage, int* count, const Vec3 color, const float refl, const float spec)
+Model* model(const char* path, Model* storage, int* count, const Vec3 color, const float refl, const float spec)
 {
-    xModel *f = xModelCreate(storage, count, MAX_MODELS, color, WALL_REFLECTIVITY * refl, spec);
-    xModelLoad(f, path);
+    Model *f = modelCreate(storage, count, MAX_MODELS, color, WALL_REFLECTIVITY * refl, spec);
+    modelLoad(f, path);
     return f;
 }
 
@@ -69,15 +70,15 @@ void scene_init()
     model("res/rect.obj", scene_models, &num_models, vec3( 0.5f,  0.0f,  0.2f), 0.2f, 0.0f);
     model("res/cube.obj", scene_models, &num_models, vec3( 1.0f,  1.0f,  1.0f), 0.0f, 1.0f);
     model("res/buny.obj", scene_models, &num_models, vec3(0.73f, 0.73f, 0.73f), 0.2f, 0.0f);
-    xModelTransform(&scene_models[0], vec3(-1.0f, -1.0f,  1.0f), vec3(-M_PI/2, 0, 0), vec3(2.0f, 2.0f, 1.0f));
-    xModelTransform(&scene_models[1], vec3(-1.0f,  1.0f, -1.0f), vec3( M_PI/2, 0, 0), vec3(2.0f, 2.0f, 1.0f));
-    xModelTransform(&scene_models[2], vec3(-1.0f, -1.0f, -1.0f), vec3(0,       0, 0), vec3(2.0f, 2.0f, 1.0f));
-    xModelTransform(&scene_models[3], vec3(-1.0f, -1.0f, -1.0f), vec3(0,  M_PI/2, 0), vec3(2.0f, 2.0f, 1.0f));
-    xModelTransform(&scene_models[4], vec3( 1.0f, -1.0f,  1.0f), vec3(0, -M_PI/2, 0), vec3(2.0f, 2.0f, 1.0f));
-    xModelTransform(&scene_models[5], vec3( 0.0f,  1.0f,  0.0f), vec3(0,       0, 0), vec3(0.5f, 0.01f,0.5f));
-    xModelTransform(&scene_models[6], vec3( 0.0f, -0.7f,  0.0f), vec3(0,       0, 0), vec3(6.0f, 6.0f, 6.0f));
+    modelTransform(&scene_models[0], vec3(-1.0f, -1.0f,  1.0f), vec3(-M_PI/2, 0, 0), vec3(2.0f, 2.0f, 1.0f));
+    modelTransform(&scene_models[1], vec3(-1.0f,  1.0f, -1.0f), vec3( M_PI/2, 0, 0), vec3(2.0f, 2.0f, 1.0f));
+    modelTransform(&scene_models[2], vec3(-1.0f, -1.0f, -1.0f), vec3(0,       0, 0), vec3(2.0f, 2.0f, 1.0f));
+    modelTransform(&scene_models[3], vec3(-1.0f, -1.0f, -1.0f), vec3(0,  M_PI/2, 0), vec3(2.0f, 2.0f, 1.0f));
+    modelTransform(&scene_models[4], vec3( 1.0f, -1.0f,  1.0f), vec3(0, -M_PI/2, 0), vec3(2.0f, 2.0f, 1.0f));
+    modelTransform(&scene_models[5], vec3( 0.0f,  1.0f,  0.0f), vec3(0,       0, 0), vec3(0.5f, 0.01f,0.5f));
+    modelTransform(&scene_models[6], vec3( 0.0f, -0.7f,  0.0f), vec3(0,       0, 0), vec3(6.0f, 6.0f, 6.0f));
 
-    xModelUpdate(scene_models, num_models);
+    modelUpdate(scene_models, num_models);
 
     // Build BVH after all models are loaded and transformed
     bvh_build(&bvh_root, scene_models, num_models);
@@ -87,16 +88,16 @@ void scene_init()
 #undef TOGGLE_REFLECTIVITY
 #undef WALL_REFLECTIVITY
 
-static inline RAY make_ray(const Vec3 origin, const Vec3 direction)
+static inline BvhRay make_ray(const Vec3 origin, const Vec3 direction)
 {
-    RAY r;
+    BvhRay r;
     r.origin = origin;
     r.direction = direction;
     r.inv_direction = vec3(1.0f / direction.x, 1.0f / direction.y, 1.0f / direction.z);
     return r;
 }
 
-bool trace_scene(const RAY ray, HitRecord *rec)
+bool trace_scene(const BvhRay ray, HitRecord *rec)
 {
     rec->hit = false;
     rec->t   = FLT_MAX;
@@ -105,7 +106,7 @@ bool trace_scene(const RAY ray, HitRecord *rec)
 
 bool is_shadow(const Vec3 point, const Vec3 normal, const Vec3 light_dir, const float light_distance)
 {
-    const RAY shadow_ray = make_ray(add(point, mul(normal, RAY_OFFSET)), light_dir);
+    const BvhRay shadow_ray = make_ray(add(point, mul(normal, RAY_OFFSET)), light_dir);
     HitRecord rec;
     rec.hit = false;
     rec.t = light_distance - EPSILON; // Only check up to light
@@ -113,7 +114,7 @@ bool is_shadow(const Vec3 point, const Vec3 normal, const Vec3 light_dir, const 
     return bvh_intersect(bvh_root, shadow_ray, &rec);
 }
 
-Vec3 calculate_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir, const xMaterial mat)
+Vec3 calculate_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir, const Material mat)
 {
     // Light position centered on ceiling
     const Vec3 light_pos = vec3(0.0f, 0.99f, 0.0f);
@@ -145,7 +146,7 @@ Vec3 calculate_lighting(const Vec3 point, const Vec3 normal, const Vec3 view_dir
     return add(add(ambient, diffuse), specular);
 }
 
-Vec3 calculate_ray_color(const RAY ray, const int depth)
+Vec3 calculate_ray_color(const BvhRay ray, const int depth)
 {
     HitRecord rec;
     if (trace_scene(ray, &rec))
@@ -160,7 +161,7 @@ Vec3 calculate_ray_color(const RAY ray, const int depth)
         if (depth > 1 && adjusted_reflectivity > 0.05f)
         {
             const Vec3 reflect_dir = reflect(ray.direction, rec.normal);
-            const RAY reflect_ray = make_ray(rec.point, reflect_dir);
+            const BvhRay reflect_ray = make_ray(rec.point, reflect_dir);
             const Vec3 reflect_color = calculate_ray_color(reflect_ray, depth - 1);
             color = add(mul(color, 1.0f - adjusted_reflectivity), mul(reflect_color, adjusted_reflectivity));
         }
@@ -190,20 +191,20 @@ uint32_t uint32(Vec3 color)
 int main()
 {
     // Initialize window
-    xWindow win;
-    xWindowInit(&win);
+    Window_t win;
+    windowInit(&win);
     win.title = XTITLE;
     win.fps = XFPS;
 
-    if (!xCreateWindow(&win)) return 1;
+    if (!createWindow(&win)) return 1;
 
     // Initialize input
-    xInput input;
-    xInputInit(&input);
+    Input input;
+    inputInit(&input);
 
     // Initialize camera
-    xCamera camera;
-    xCameraInit(&camera);
+    Camera camera;
+    cameraInit(&camera);
     camera.position = vec3(0.0f, 0.0f, 2.0f);
     camera.yaw = -90.0f;
 
@@ -225,33 +226,33 @@ int main()
     // Main loop
     while (1)
     {
-        printf("FPS: %.2f\n", xGetFPS(&win));
-        // Update xModel transform values
+        printf("FPS: %.2f\n", getFPS(&win));
+        // Update Model transform values
         if (alpha == 630) { alpha = 0; } alpha++; // turn one time and reset
-        xModelTransform(&scene_models[6], vec3(0.0f, -0.8f, 0.0f), vec3(0, alpha * 0.01f, 0), vec3(6.0f, 6.0f, 6.0f));
+        modelTransform(&scene_models[6], vec3(0.0f, -0.8f, 0.0f), vec3(0, alpha * 0.01f, 0), vec3(6.0f, 6.0f, 6.0f));
 
-        xModelUpdate(scene_models, num_models);
+        modelUpdate(scene_models, num_models);
         bvh_free(bvh_root); // Free previous BVH
         bvh_build(&bvh_root, scene_models, num_models);
 
         // Poll events with explicit input state
-        if (xPollEvents(win.display, &input)) break;
-        if (xIsKeyPressed(&input, KEY_ESCAPE)) break;
+        if (pollEvents(win.display, &input)) break;
+        if (isKeyPressed(&input, KEY_ESCAPE)) break;
 
         // Mouse look
         int dx, dy;
-        xGetMouseDelta(&input, &dx, &dy);
-        xGrabMouse(win.display, win.window, win.width, win.height, &input);
-        xCameraRotate(&camera, dx * SENS_X, -dy * SENS_Y);
+        getMouseDelta(&input, &dx, &dy);
+        grabMouse(win.display, win.window, win.width, win.height, &input);
+        cameraRotate(&camera, dx * SENS_X, -dy * SENS_Y);
 
         // Keyboard movement
         const float move_speed = 0.03f;
-        if (xIsKeyDown(&input, KEY_W)) xCameraMove(&camera, camera.front, move_speed);
-        if (xIsKeyDown(&input, KEY_S)) xCameraMove(&camera, mul(camera.front, -1), move_speed);
-        if (xIsKeyDown(&input, KEY_A)) xCameraMove(&camera, mul(camera.right, -1), move_speed);
-        if (xIsKeyDown(&input, KEY_D)) xCameraMove(&camera, camera.right, move_speed);
-        if (xIsKeyDown(&input, KEY_Q)) xCameraMove(&camera, vec3(0, -1, 0), move_speed);
-        if (xIsKeyDown(&input, KEY_E)) xCameraMove(&camera, vec3(0, 1, 0), move_speed);
+        if (isKeyDown(&input, KEY_W)) cameraMove(&camera, camera.front, move_speed);
+        if (isKeyDown(&input, KEY_S)) cameraMove(&camera, mul(camera.front, -1), move_speed);
+        if (isKeyDown(&input, KEY_A)) cameraMove(&camera, mul(camera.right, -1), move_speed);
+        if (isKeyDown(&input, KEY_D)) cameraMove(&camera, camera.right, move_speed);
+        if (isKeyDown(&input, KEY_Q)) cameraMove(&camera, vec3(0, -1, 0), move_speed);
+        if (isKeyDown(&input, KEY_E)) cameraMove(&camera, vec3(0, 1, 0), move_speed);
 
         // Render
         #pragma omp parallel for schedule(dynamic) collapse(2) default(none) shared(win, camera, u_offsets, v_offsets)
@@ -268,8 +269,8 @@ int main()
                     uint32_t* restrict row = &win.buffer[y * win.width];
                     for (int x = tx; x < x_end; x++)
                     {
-                        Ray cam_ray = xCameraGetRay(&camera, u_offsets[x], v_offsets[y]);
-                        RAY ray = make_ray(cam_ray.origin, cam_ray.direction);
+                        Ray cam_ray = cameraGetRay(&camera, u_offsets[x], v_offsets[y]);
+                        BvhRay ray = make_ray(cam_ray.origin, cam_ray.direction);
                         row[x] = uint32(calculate_ray_color(ray, MAX_BOUNCES));
                     }
                 }
@@ -277,9 +278,9 @@ int main()
         }
 
 
-        xUpdateFramebuffer(&win);
-        xUpdateFrame(&win);
-        xUpdateInput(&input);
+        updateFramebuffer(&win);
+        updateFrame(&win);
+        updateInput(&input);
     }
 
     // Cleanup
@@ -288,8 +289,8 @@ int main()
     free(u_offsets);
     free(v_offsets);
 
-    for (int i = 0; i < num_models; i++) xModelFree(&scene_models[i]);
+    for (int i = 0; i < num_models; i++) modelFree(&scene_models[i]);
 
-    xDestroyWindow(&win);
+    destroyWindow(&win);
     return 0;
 }
