@@ -236,7 +236,7 @@ int main()
         bvh_build(&bvh_root, scene_models, num_models);
 
         // Poll events with explicit input state
-        if (pollEvents(win.display, &input)) break;
+        if (pollEvents(&win, &input)) break;
         if (isKeyPressed(&input, KEY_ESCAPE)) break;
 
         // Mouse look
