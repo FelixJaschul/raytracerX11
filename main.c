@@ -1,9 +1,7 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <stdbool.h>
 #include <math.h>
 #include <float.h>
-#include <stdint.h>
 
 #define CORE_IMPLEMENTATION
 #define KEYS_IMPLEMENTATION
@@ -70,11 +68,11 @@ void scene_init()
     model("res/rect.obj", scene_models, &num_models, vec3( 0.5f,  0.0f,  0.2f), 0.2f, 0.0f);
     model("res/cube.obj", scene_models, &num_models, vec3( 1.0f,  1.0f,  1.0f), 0.0f, 1.0f);
     model("res/buny.obj", scene_models, &num_models, vec3(0.73f, 0.73f, 0.73f), 0.2f, 0.0f);
-    modelTransform(&scene_models[0], vec3(-1.0f, -1.0f,  1.0f), vec3(-M_PI/2, 0, 0), vec3(2.0f, 2.0f, 1.0f));
+    modelTransform(&scene_models[0], vec3(-1.0f, -1.0f,  1.0f), vec3((float)-M_PI/2, 0, 0), vec3(2.0f, 2.0f, 1.0f));
     modelTransform(&scene_models[1], vec3(-1.0f,  1.0f, -1.0f), vec3( M_PI/2, 0, 0), vec3(2.0f, 2.0f, 1.0f));
     modelTransform(&scene_models[2], vec3(-1.0f, -1.0f, -1.0f), vec3(0,       0, 0), vec3(2.0f, 2.0f, 1.0f));
     modelTransform(&scene_models[3], vec3(-1.0f, -1.0f, -1.0f), vec3(0,  M_PI/2, 0), vec3(2.0f, 2.0f, 1.0f));
-    modelTransform(&scene_models[4], vec3( 1.0f, -1.0f,  1.0f), vec3(0, -M_PI/2, 0), vec3(2.0f, 2.0f, 1.0f));
+    modelTransform(&scene_models[4], vec3( 1.0f, -1.0f,  1.0f), vec3(0, (float)-M_PI/2, 0), vec3(2.0f, 2.0f, 1.0f));
     modelTransform(&scene_models[5], vec3( 0.0f,  1.0f,  0.0f), vec3(0,       0, 0), vec3(0.5f, 0.01f,0.5f));
     modelTransform(&scene_models[6], vec3( 0.0f, -0.7f,  0.0f), vec3(0,       0, 0), vec3(6.0f, 6.0f, 6.0f));
 
@@ -229,7 +227,7 @@ int main()
         printf("FPS: %.2f\n", getFPS(&win));
         // Update Model transform values
         if (alpha == 630) { alpha = 0; } alpha++; // turn one time and reset
-        modelTransform(&scene_models[6], vec3(0.0f, -0.8f, 0.0f), vec3(0, alpha * 0.01f, 0), vec3(6.0f, 6.0f, 6.0f));
+        modelTransform(&scene_models[6], vec3(0.0f, -0.8f, 0.0f), vec3(0, (float)alpha * 0.01f, 0), vec3(6.0f, 6.0f, 6.0f));
 
         modelUpdate(scene_models, num_models);
         bvh_free(bvh_root); // Free previous BVH
@@ -243,7 +241,7 @@ int main()
         int dx, dy;
         getMouseDelta(&input, &dx, &dy);
         grabMouse(win.display, win.window, win.width, win.height, &input);
-        cameraRotate(&camera, dx * SENS_X, -dy * SENS_Y);
+        cameraRotate(&camera, (float)dx * SENS_X, (float)-dy * SENS_Y);
 
         // Keyboard movement
         const float move_speed = 0.03f;
@@ -271,7 +269,21 @@ int main()
                     {
                         Ray cam_ray = cameraGetRay(&camera, u_offsets[x], v_offsets[y]);
                         BvhRay ray = make_ray(cam_ray.origin, cam_ray.direction);
-                        row[x] = uint32(calculate_ray_color(ray, MAX_BOUNCES));
+                        Vec3 color = calculate_ray_color(ray, MAX_BOUNCES);
+                        // 1. Clamp to SDR range
+                        color.x = CLAMP(color.x, 0.0f, 1.0f);
+                        color.y = CLAMP(color.y, 0.0f, 1.0f);
+                        color.z = CLAMP(color.z, 0.0f, 1.0f);
+
+                        // 2. Apply gamma correction
+                        color = vec3(
+                            powf(color.x, 1.0f / 2.2f),
+                            powf(color.y, 1.0f / 2.2f),
+                            powf(color.z, 1.0f / 2.2f)
+                        );
+
+                        // 4. Convert to 8-bit integer
+                        row[x] = ((int)(color.x * 255) << 16) | ((int)(color.y * 255) << 8) | (int)(color.z * 255);
                     }
                 }
             }
